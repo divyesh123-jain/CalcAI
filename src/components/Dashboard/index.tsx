@@ -1,13 +1,38 @@
 "use client"
 import React, { useEffect, useRef, useState } from "react";
 import CanvasContainer from "../CanvasContainer";
+import axios from "axios";
+import { Button } from "../ui/button";
 
+interface Response{
+    expr : string;
+    result : string;
+    assign : boolean
 
+}
+
+interface GeneratedResult {
+    expression : string;
+    answer : string;
+}
 
 export default function Dashboard() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [selectedColor, setSelectedColor] = useState("tomato"); // Changed default color
+  const [selectedColor, setSelectedColor] = useState("tomato"); 
+  const [reset , setReset] = useState(false);
+  const [result , setResult] = useState<GeneratedResult | null>(null);
+  const [variable  , setVariable ] = useState({});
+  useEffect(() => {
+    if(reset){
+        resetCanvas()
+        setReset(false)
+    }
+  } , [reset])
+
+
+
+
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -59,6 +84,27 @@ export default function Dashboard() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  const sendData = async () => {
+    const canvas = canvasRef.current
+    if(canvas){
+        const response = await axios(
+            {
+                method: 'POST',
+                // url: `${}`,
+                data:{
+                    image: canvas.toDataURL('image/png'),
+                    variable: variable
+                }
+
+            }
+        )
+
+        const resp =  response.data
+        console.log('response' , resp)
+    }
+
+}
+
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -88,7 +134,20 @@ export default function Dashboard() {
     }
   };
 
+  const resetCanvas = ()  => {
+    const canvas = canvasRef.current;
+    if(canvas){
+        const ctx = canvas.getContext('2d')
+        if(ctx) {
+            ctx.clearRect(0 , 0 , canvas.width , canvas.height)
+
+        }
+    }
+  }
+  
+
   return (
+    <>
     <div className="relative w-full h-screen bg-black">
       <CanvasContainer setColor={setSelectedColor} selectedColor={selectedColor} />
       <canvas
@@ -99,6 +158,11 @@ export default function Dashboard() {
         onMouseUp={stopDrawing}
         onMouseOut={stopDrawing}
       />
+      <div className="absolute bottom-4 left-4 flex space-x-4">
+        <Button onClick={sendData}>Calculate</Button>
+        <Button onClick={() => setReset(true)}>Reset</Button>
+      </div>
     </div>
+    </>
   );
 }
