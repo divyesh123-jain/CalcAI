@@ -9,7 +9,7 @@ interface ImageDataResponse {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
 
-export async function analyzeImage(
+export default async function analyzeImage(
   imageBuffer: Buffer, 
   dictOfVars: Record<string, unknown>
 ): Promise<ImageDataResponse[]> {
