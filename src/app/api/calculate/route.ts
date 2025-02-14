@@ -28,7 +28,7 @@ function extractJsonFromMarkdown(markdown: string): string {
   throw new Error("No valid JSON array found in response");
 }
 
-export async function analyzeImage(
+async function analyzeImage(
   imageBase64: string,
   variable: Record<string, unknown>
 ): Promise<GeneratedResult> {
