@@ -9,7 +9,7 @@ interface CanvasContainerProps {
     
     return (
       <div 
-        className="absolute bg-gray-500 left-4 rounded-xl top-1/2 -translate-y-1/2 flex flex-col items-center gap-2 p-4 z-10"
+        className="absolute bg-indigo-500/50  left-4 rounded-xl top-1/2 -translate-y-1/2 flex flex-col shadow-indigo-500/50 shadow-2xl items-center gap-2 p-4 z-10"
         onClick={(e) => e.stopPropagation()}
       >
         <BsPenFill className="text-black my-2" />
