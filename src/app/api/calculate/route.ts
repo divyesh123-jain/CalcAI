@@ -216,11 +216,39 @@ async function analyzeImage(
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const variableStr = JSON.stringify(variable);
 
     const prompt = `
-      Analyze the given image containing mathematical expressions or equations.
-      ...
-    `.trim();
+      Analyze the given image containing mathematical expressions or equations.  
+
+### Rules for Solving:
+- **Use PEMDAS for expressions**:  
+  - Parentheses → Exponents → Multiplication & Division (L → R) → Addition & Subtraction (L → R).  
+- **For equations**, solve for variables based on the provided information.  
+
+### Variables Provided:
+${variableStr}  
+
+### Expected JSON Output:
+- **Return ONLY a JSON array**, with no additional text or markdown.
+- **Format:**  
+  \`\`\`json
+  [{"expr": "2+2", "result": "4", "assign": false}]
+  \`\`\`
+- **Handling Different Cases:**  
+  1. **Mathematical Expressions (e.g., \`2 + 3 * 4\`)** → Solve and return:  
+     \`[{ "expr": "2+3*4", "result": "14", "assign": false }]\`  
+  2. **Equations with Variables (e.g., \`2x + 3 = 7\`)** → Solve for \`x\`:  
+     \`[{ "expr": "x", "result": "2", "assign": true }]\`  
+  3. **Multiple Variable Equations (e.g., \`x + y = 10\`, \`x - y = 2\`)** → Solve separately:  
+     \`[{ "expr": "x", "result": "6", "assign": true }, { "expr": "y", "result": "4", "assign": true }]\`  
+  4. **Direct Variable Assignments (e.g., \`x = 5\`)** → Return assignment:  
+  \`[{ "expr": "x", "result": "5", "assign": true }
+   
+  5. **Graphical or Abstract Math Problems** → Extract numerical or conceptual meaning and return accordingly.  
+
+**Ensure valid JSON formatting and correctness in all responses.**  
+`.trim();
 
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
     const image = {
