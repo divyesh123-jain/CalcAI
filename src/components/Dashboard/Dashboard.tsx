@@ -1,10 +1,10 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
+// components/DashboardComponent.tsx
 "use client";
 import React, { useEffect, useRef, useState , KeyboardEvent, WheelEvent } from "react";
 import Canvas from "../canvas/Canvas";
 import Toolbar from "../ToolBar";
-// import Minimap from "../MiniMap";
+import Minimap from "../MiniMap";
+import LatexDisplay from "../Latexdisplay";
 import ResultsDisplay from "../ResultDisplay";
 
 import KeyboardShortcuts from "../KeyboardShortcuts";
@@ -632,14 +632,13 @@ export default function DashboardComponent() {
     if (!showMinimap) return null;
 
     return (
-      // <Minimap
-      //   minimapRef={minimapRef}
-      //   viewport={viewport}
-      //   canvasDimensions={canvasDimensions}
-      //   drawingHistory={drawingHistory}
-      //   showMinimap={showMinimap}
-      // />
-      <></>
+      <Minimap
+        minimapRef={minimapRef}
+        viewport={viewport}
+        canvasDimensions={canvasDimensions}
+        drawingHistory={drawingHistory}
+        showMinimap={showMinimap}
+      />
     );
   };
 
@@ -764,18 +763,18 @@ export default function DashboardComponent() {
     }
   };
 
-  // const handleLatexDrag = (index: number, e: any, ui: any) => {
-  //   setLatexPosition({
-  //     x: ui.x,
-  //     y: ui.y,
-  //   });
-  // };
+  const handleLatexDrag = (index: number, e: any, ui: any) => {
+    setLatexPosition({
+      x: ui.x,
+      y: ui.y,
+    });
+  };
 
-  // const handleErase = (index: number) => {
-  //   if (isErasing) {
-  //     setLatexExpression(latexExpression.filter((_, i) => i !== index));
-  //   }
-  // };
+  const handleErase = (index: number) => {
+    if (isErasing) {
+      setLatexExpression(latexExpression.filter((_, i) => i !== index));
+    }
+  };
 
   const getCursor = () => {
     switch (tool) {
@@ -887,12 +886,12 @@ export default function DashboardComponent() {
       <Canvas {...canvasProps} />
       {renderMinimap()}
       <KeyboardShortcuts />
-      {/* <LatexDisplay
+      <LatexDisplay
         latexExpression={latexExpression}
         latexPosition={latexPosition}
         onLatexDrag={handleLatexDrag}
         onEraseLatex={handleErase}
-      /> */}
+      />
       <ResultsDisplay result={result} />
       {/* <ErrorDisplay error={error} /> */}
     </div>
