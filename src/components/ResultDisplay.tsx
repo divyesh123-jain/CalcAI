@@ -1,26 +1,143 @@
 // components/ResultsDisplay.tsx
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { Copy, CheckCircle, X, Calculator, TrendingUp, AlertCircle } from "lucide-react";
 
 interface GeneratedResult {
   expression: string;
   answer: string;
 }
 
-interface ResultsDisplayProps {
+interface ResultDisplayProps {
   result: GeneratedResult | null;
 }
 
-const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ result }) => {
+const ResultsDisplay: React.FC<ResultDisplayProps> = ({ result }) => {
+  const [isCopied, setIsCopied] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (result) {
+      setIsVisible(true);
+    }
+  }, [result]);
+
+  const handleCopy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleClose = () => {
+    setIsVisible(false);
+  };
+
+  if (!result || !isVisible) return null;
+
   return (
-    <>
-      {result && (
-        <div className="absolute top-24 right-4 bg-white/10 p-4 rounded-lg backdrop-blur-sm text-white shadow-lg">
-          <p>Expression: {result.expression}</p>
-          <p>Answer: {result.answer}</p>
+    <div className="fixed bottom-6 right-6 z-50">
+      <div className={`
+        transform transition-all duration-500 ease-out
+        ${isVisible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95'}
+      `}>
+        <div className="w-96 p-6 rounded-2xl backdrop-blur-lg bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 border border-emerald-400/20 shadow-2xl">
+          
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 flex items-center justify-center">
+                <Calculator className="w-4 h-4 text-white" />
+              </div>
+              <h3 className="text-white font-semibold">Calculation Result</h3>
+            </div>
+            <button
+              onClick={handleClose}
+              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 transition-colors flex items-center justify-center text-white/70 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Expression */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="w-4 h-4 text-cyan-400" />
+              <span className="text-white/70 text-sm font-medium">Expression</span>
+            </div>
+            <div className="relative group">
+              <div className="p-3 rounded-lg bg-white/5 border border-white/10 font-mono text-white">
+                {result.expression}
+              </div>
+              <button
+                onClick={() => handleCopy(result.expression)}
+                className="absolute top-2 right-2 w-6 h-6 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-white/10 hover:bg-white/20 flex items-center justify-center"
+              >
+                {isCopied ? (
+                  <CheckCircle className="w-3 h-3 text-green-400" />
+                ) : (
+                  <Copy className="w-3 h-3 text-white/70" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Answer */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <AlertCircle className="w-4 h-4 text-emerald-400" />
+              <span className="text-white/70 text-sm font-medium">Answer</span>
+            </div>
+            <div className="relative group">
+              <div className="p-4 rounded-lg bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 border border-emerald-400/30">
+                <div className="text-2xl font-bold text-emerald-300 font-mono">
+                  {result.answer}
+                </div>
+              </div>
+              <button
+                onClick={() => handleCopy(result.answer)}
+                className="absolute top-3 right-3 w-6 h-6 rounded opacity-0 group-hover:opacity-100 transition-opacity bg-white/10 hover:bg-white/20 flex items-center justify-center"
+              >
+                {isCopied ? (
+                  <CheckCircle className="w-3 h-3 text-green-400" />
+                ) : (
+                  <Copy className="w-3 h-3 text-white/70" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={() => handleCopy(`${result.expression} = ${result.answer}`)}
+              className="flex-1 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2"
+            >
+              <Copy className="w-3 h-3" />
+              Copy Both
+            </button>
+            <button
+              onClick={handleClose}
+              className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white/80 text-sm font-medium transition-all duration-200"
+            >
+              Dismiss
+            </button>
+          </div>
+
+          {/* Copy confirmation */}
+          {isCopied && (
+            <div className="absolute -top-12 left-1/2 transform -translate-x-1/2">
+              <div className="px-3 py-1 rounded-lg bg-green-500 text-white text-sm font-medium">
+                Copied to clipboard!
+              </div>
+            </div>
+          )}
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 };
 

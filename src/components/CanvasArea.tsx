@@ -6,32 +6,27 @@ import {
   ViewPort,
   Point,
   CanvasDimensions,
-} from "./Dashboard/Dashboard"; 
+  Tool
+} from "../lib/types";
+
 interface CanvasAreaProps {
   viewport: ViewPort;
-  setViewport: (viewport: ViewPort) => void;
-  tool: 'draw' | 'hand' | 'eraser';
+  setViewport: React.Dispatch<React.SetStateAction<ViewPort>>; // Corrected type!
+  tool: Tool;
   isEraserEnabled: boolean;
   drawingHistory: ImageData | null;
   setDrawingHistory: (history: ImageData | null) => void;
   saveToHistory: (imageData: string) => void;
   updateMinimap: (preserveDrawings?: boolean) => void;
-  resetCanvasFn: () => void; // More descriptive name
+  // resetCanvasFn: () => void; // More descriptive name
   canvasDimensions: CanvasDimensions;
-  setTool: (tool: 'draw' | 'hand' | 'eraser') => void;
+  setTool: (tool: Tool) => void;
   setIsPanning: React.Dispatch<React.SetStateAction<boolean>>;
   setLastPanPoint: React.Dispatch<React.SetStateAction<Point | null>>;
   isPanning: boolean;
   lastPanPoint: Point | null;
+    selectedColor:string
 }
-
-// const ZOOM_SENSITIVITY = 0.001;
-// const PAN_SENSITIVITY = 1.2;
-// const MIN_ZOOM = 0.1;
-// const MAX_ZOOM = 5;
-// const ZOOM_SPEED = 0.1;
-// const DEFAULT_VIEWPORT: ViewPort = { x: 0, y: 0, zoom: 1 };
-
 
 const CanvasArea: React.FC<CanvasAreaProps> = ({
   viewport,
@@ -42,23 +37,19 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
   setDrawingHistory,
   saveToHistory,
   updateMinimap,
-//   resetCanvasFn,
   canvasDimensions,
-//   setTool,
   setIsPanning,
   setLastPanPoint,
   isPanning,
-  lastPanPoint
+  lastPanPoint,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const minimapRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-//   const [selectedColor, setSelectedColor] = useState("tomato");
 
 
   useEffect(() => {
     initializeCanvas();
-    // updateCanvas(true); // Initial canvas draw
     if (minimapRef.current) {
       const minimapCtx = minimapRef.current.getContext('2d');
       if (minimapCtx) {
@@ -69,10 +60,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
      requestAnimationFrame(() => {
       updateCanvas(true);
     });
-
-
   }, []);
-
 
   const initializeCanvas = () => {
     const canvas = canvasRef.current;
@@ -86,11 +74,9 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         drawGrid(ctx);
-
       }
     }
   };
-
 
   const drawGrid = (ctx: CanvasRenderingContext2D) => {
     const { x, y, zoom } = viewport;
@@ -113,7 +99,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
     }
      updateMinimap();
   };
-
 
   const updateCanvas = (preserveDrawings = false) => {
     const canvas = canvasRef.current;
@@ -205,7 +190,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
     }
   };
 
-
   const startPanning = (e: React.MouseEvent<HTMLCanvasElement>) => {
     setIsPanning(true);
     setLastPanPoint({ x: e.clientX, y: e.clientY });
@@ -217,7 +201,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
       const dx = e.clientX - lastPanPoint.x;
       const dy = e.clientY - lastPanPoint.y;
 
-      setViewport((prev: { x: number; y: number; }) => ({
+      setViewport((prev) => ({
         ...prev,
         x: prev.x + dx,
         y: prev.y + dy
@@ -235,29 +219,11 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
     }
   };
 
-
   const stopPanning = () => {
     setIsPanning(false);
     setLastPanPoint(null);
     stopDrawing();
   };
-
-
-//   const renderMinimap = () => {
-
-//     return (
-//       <div className="absolute bottom-4 left-4 w-48 h-48 bg-black/50 border border-white/20 rounded-lg overflow-hidden">
-//         <canvas
-//           ref={minimapRef}
-//           className="w-full h-full"
-//           style={{ opacity: 0.7 }}
-//         />
-
-//       </div>
-//     );
-//   };
-
-
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -273,7 +239,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
       }
     }
   };
-
 
   const transformPoint = (x: number, y: number): Point => {
     return {
@@ -296,7 +261,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
       }
     }
   };
-
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
@@ -322,7 +286,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
     updateMinimap(true);
   };
 
-
   const getCursor = () => {
     switch (tool) {
       case 'hand':
@@ -333,7 +296,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
         return 'default';
     }
   };
-
 
   return (
     <>
@@ -369,8 +331,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
               }}
             />
       </div>
-
-
     </>
   );
 };
