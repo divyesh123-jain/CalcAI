@@ -1,11 +1,12 @@
 // components/ResultsDisplay.tsx
 "use client";
 import React, { useState, useEffect } from "react";
-import { Copy, CheckCircle, X, Calculator, TrendingUp, AlertCircle } from "lucide-react";
+import { Copy, CheckCircle, X, Calculator, TrendingUp, AlertCircle, BookOpen } from "lucide-react";
 
 interface GeneratedResult {
   expression: string;
   answer: string;
+  steps?: string[];
 }
 
 interface ResultDisplayProps {
@@ -84,6 +85,26 @@ const ResultsDisplay: React.FC<ResultDisplayProps> = ({ result }) => {
               </button>
             </div>
           </div>
+
+          {/* Steps - Show if available */}
+          {result.steps && result.steps.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <BookOpen className="w-4 h-4 text-blue-400" />
+                <span className="text-white/70 text-sm font-medium">Solution Steps</span>
+              </div>
+              <div className="space-y-2">
+                {result.steps.map((step, index) => (
+                  <div key={index} className="flex items-start gap-3 p-2 rounded-lg bg-white/5 border border-white/10">
+                    <div className="w-5 h-5 rounded-full bg-blue-500/20 border border-blue-400/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="text-blue-300 text-xs font-medium">{index + 1}</span>
+                    </div>
+                    <div className="text-white/80 text-sm font-mono">{step}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Answer */}
           <div>

@@ -114,6 +114,8 @@ export default function DashboardComponent() {
 
   const handleReset = () => {
     resetCanvas();
+    setTexts([]);
+    setSelectedTextId(null);
     setCanvasKey((k) => k + 1);
   };
 
@@ -123,7 +125,7 @@ export default function DashboardComponent() {
     currentStep,
     historyLength: history.length,
     tool,
-    onCalculate: sendData,
+    onCalculate: () => sendData(texts, textStyle),
     onReset: handleReset,
     onUndo: undo,
     onRedo: redo,

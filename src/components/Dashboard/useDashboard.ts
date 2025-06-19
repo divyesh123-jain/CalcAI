@@ -17,6 +17,7 @@ interface ViewPort {
 interface GeneratedResult {
   expression: string;
   answer: string;
+  steps?: string[];
 }
 
 interface CanvasDimensions {
@@ -73,7 +74,7 @@ interface UseDashboardReturn {
   redo: () => void;
   restoreCanvasState: (imageData: string) => void;
   resetCanvas: () => void;
-  sendData: () => Promise<void>;
+  sendData: (texts?: Array<{id: string, text: string, x: number, y: number, rotation: number}>, textStyle?: {fontFamily: string, fontSize: number, color: string, opacity: number, fontWeight: string, fontStyle: string}) => Promise<void>;
   handleMouseDown: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleMouseMove: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleMouseUp: () => void;
@@ -716,7 +717,7 @@ export const useDashboard = (): UseDashboardReturn => {
     }, 50);
   };
 
-  const sendData = async () => {
+  const sendData = async (texts?: Array<{id: string, text: string, x: number, y: number, rotation: number}>, textStyle?: {fontFamily: string, fontSize: number, color: string, opacity: number, fontWeight: string, fontStyle: string}) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -724,7 +725,47 @@ export const useDashboard = (): UseDashboardReturn => {
       setIsLoading(true);
       setError(null);
 
-      const imageData = canvas.toDataURL("image/png");
+      // Create a temporary canvas to combine drawn content and text
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return;
+
+      // Set same dimensions as main canvas
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+
+      // Copy the main canvas content
+      tempCtx.drawImage(canvas, 0, 0);
+
+      // Render text elements onto the temporary canvas if provided
+      if (texts && textStyle) {
+        texts.forEach(textElement => {
+          if (textElement.text.trim()) {
+            tempCtx.save();
+            
+            // Move to text position and apply rotation
+            tempCtx.translate(textElement.x, textElement.y);
+            tempCtx.rotate((textElement.rotation * Math.PI) / 180);
+            
+            // Set text styling
+            tempCtx.font = `${textStyle.fontStyle} ${textStyle.fontWeight} ${textStyle.fontSize}px ${textStyle.fontFamily}`;
+            tempCtx.fillStyle = textStyle.color;
+            tempCtx.globalAlpha = textStyle.opacity;
+            tempCtx.textAlign = 'left';
+            tempCtx.textBaseline = 'top';
+            
+            // Handle multi-line text
+            const lines = textElement.text.split('\n');
+            lines.forEach((line, index) => {
+              tempCtx.fillText(line, 0, index * textStyle.fontSize * 1.2);
+            });
+            
+            tempCtx.restore();
+          }
+        });
+      }
+
+      const imageData = tempCanvas.toDataURL("image/png");
       const response = await axios({
         method: "POST",
         url: "/api/calculate",
