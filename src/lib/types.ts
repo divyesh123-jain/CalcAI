@@ -40,63 +40,7 @@ export interface Point {
   }
 
   export type BrushType = 'pencil' | 'marker' | 'highlighter';
-  export type Tool = 'draw' | 'hand' | 'eraser' | 'text' | 'select';
-
-  // Drawing-related types
-  export interface DrawingElement {
-    id: string;
-    type: 'stroke';
-    points: Point[];
-    color: string;
-    brushType: BrushType;
-    lineWidth: number;
-    opacity: number;
-    x: number; // bounding box x
-    y: number; // bounding box y
-    width: number; // bounding box width
-    height: number; // bounding box height
-    rotation: number;
-    isSelected?: boolean;
-  }
-
-  export interface BoundingBox {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  }
-
-  // Text-related types
-  export interface TextElement {
-    id: string;
-    x: number;
-    y: number;
-    text: string;
-    fontSize: number;
-    fontFamily: string;
-    color: string;
-    opacity: number;
-    rotation: number;
-    width?: number;
-    height?: number;
-    isEditing?: boolean;
-  }
-
-  export interface TextStyle {
-    fontSize: number;
-    fontFamily: string;
-    color: string;
-    opacity: number;
-    fontWeight: 'normal' | 'bold';
-    fontStyle: 'normal' | 'italic';
-    textAlign: 'left' | 'center' | 'right';
-  }
-
-  export interface FontOption {
-    name: string;
-    family: string;
-    category: 'serif' | 'sans-serif' | 'monospace' | 'handwriting' | 'display';
-  }
+  export type Tool = 'draw' | 'hand' | 'eraser' | 'text';
 
   // New types for enhanced UI
   export interface UITheme {
@@ -121,4 +65,28 @@ export interface Point {
   export interface ColorPalette {
     name: string;
     colors: string[];
+  }
+
+  export interface TextElement {
+    id: string;
+    text: string;
+    x: number;
+    y: number;
+    rotation: number;
+  }
+
+  export interface TextStyle {
+    fontFamily: string;
+    fontSize: number;
+    color: string;
+    opacity: number;
+    fontWeight: 'normal' | 'bold';
+    fontStyle: 'normal' | 'italic';
+    textAlign: 'left' | 'center' | 'right';
+  }
+
+  export interface FontOption {
+    name: string;
+    family: string;
+    category: 'sans-serif' | 'serif' | 'monospace' | 'handwriting' | 'display';
   }

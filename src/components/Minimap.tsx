@@ -235,9 +235,7 @@ const Minimap: React.FC<MinimapProps> = ({
     });
   }, [viewport, onViewportChange, canvasDimensions, minimapSize]);
 
-  const handleCanvasClick = useCallback((_e: React.MouseEvent) => {
-    // Implementation of handleCanvasClick
-  }, []);
+  // Removed unused handleCanvasClick and its unused parameter
 
   if (!isVisible) {
     return (

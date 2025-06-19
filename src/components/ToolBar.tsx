@@ -23,12 +23,9 @@ import {
   Eye,
   EyeOff,
   Sparkles,
-  Activity,
-  Type,
-  MousePointer2,
-  Move,
-  CheckSquare
+  Activity
 } from "lucide-react";
+import { FaEraser, FaHandPaper, FaPencilAlt, FaFont } from "react-icons/fa";
 
 interface ToolbarProps {
   isLoading: boolean;
@@ -52,14 +49,14 @@ interface ToolbarProps {
   showColorPicker?: boolean;
   onToggleColorPicker?: () => void;
   onToggleCanvasSettings?: () => void;
-  onToggleTextPanel?: () => void;
-  showTextPanel?: boolean;
-  onSelectAllDrawings?: () => void;
-  onDeselectAll?: () => void;
-  onToggleMoveMode?: () => void;
-  isAllSelected?: boolean;
-  isMoveMode?: boolean;
 }
+
+const tools = [
+  { id: 'draw', icon: FaPencilAlt, tooltip: 'Draw (D)' },
+  { id: 'hand', icon: FaHandPaper, tooltip: 'Hand Tool (H)' },
+  { id: 'eraser', icon: FaEraser, tooltip: 'Eraser (E)' },
+  { id: 'text', icon: FaFont, tooltip: 'Text (T)' },
+] as const;
 
 const Toolbar: React.FC<ToolbarProps> = ({
   isLoading,
@@ -83,13 +80,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   showColorPicker = false,
   onToggleColorPicker,
   onToggleCanvasSettings,
-  onToggleTextPanel,
-  showTextPanel = false,
-  onSelectAllDrawings,
-  onDeselectAll,
-  onToggleMoveMode,
-  isAllSelected,
-  isMoveMode,
 }) => {
   const [showSettings, setShowSettings] = useState(false);
 
@@ -187,28 +177,22 @@ const Toolbar: React.FC<ToolbarProps> = ({
               isActive={tool === 'draw' && !isEraserEnabled}
             />
             <ToolButton
-              icon={MousePointer2}
-              label="Select Tool (S)"
-              onClick={() => onSetTool('select')}
-              isActive={tool === 'select'}
-            />
-            <ToolButton
               icon={Hand}
               label="Pan Tool (H)"
               onClick={toggleHandTool}
               isActive={tool === 'hand'}
             />
             <ToolButton
-              icon={Type}
-              label="Text Tool (T)"
-              onClick={() => onSetTool('text')}
-              isActive={tool === 'text'}
-            />
-            <ToolButton
               icon={Eraser}
               label="Eraser (E)"
               onClick={onToggleEraser}
               isActive={isEraserEnabled || tool === 'eraser'}
+            />
+            <ToolButton
+              icon={FaFont}
+              label="Text Tool (T)"
+              onClick={() => onSetTool('text')}
+              isActive={tool === 'text'}
             />
           </div>
 
@@ -280,25 +264,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
           {/* Additional Controls */}
           <div className="flex gap-1 sm:gap-2 flex-shrink-0">
-            {/* Drawing Controls - only show when in select tool */}
-            {tool === 'select' && onSelectAllDrawings && (
-              <>
-                <ToolButton
-                  icon={CheckSquare}
-                  label="Select All (Ctrl+A)"
-                  onClick={isAllSelected ? onDeselectAll! : onSelectAllDrawings}
-                  isActive={isAllSelected}
-                />
-                <ToolButton
-                  icon={Move}
-                  label="Move Mode (M)"
-                  onClick={onToggleMoveMode!}
-                  isActive={isMoveMode}
-                />
-                <div className="w-px h-6 sm:h-8 bg-white/20 flex-shrink-0" />
-              </>
-            )}
-            
             <ToolButton
               icon={Map}
               label="Toggle Minimap"
@@ -311,14 +276,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 label="Color Picker"
                 onClick={onToggleColorPicker}
                 isActive={showColorPicker}
-              />
-            )}
-            {onToggleTextPanel && tool === 'text' && (
-              <ToolButton
-                icon={Type}
-                label="Text Panel"
-                onClick={onToggleTextPanel}
-                isActive={showTextPanel}
               />
             )}
             {onToggleCanvasSettings && (

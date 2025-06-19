@@ -14,12 +14,6 @@ interface ViewPort {
   zoom: number;
 }
 
-// interface Response {
-//   expr: string;
-//   result: string;
-//   assign: boolean;
-// }
-
 interface GeneratedResult {
   expression: string;
   answer: string;
@@ -30,18 +24,9 @@ interface CanvasDimensions {
   height: number;
 }
 
-// interface CanvasLayers {
-//   grid: HTMLCanvasElement | null;
-//   drawing: HTMLCanvasElement | null;
-//   temp: HTMLCanvasElement | null;
-// }
-
 interface UseDashboardReturn {
-  // Refs - SINGLE CANVAS SYSTEM
-  canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  minimapRef: React.RefObject<HTMLCanvasElement | null>;
-  
-  // State variables
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+  minimapRef: React.RefObject<HTMLCanvasElement>;
   canvasDimensions: CanvasDimensions;
   isDrawing: boolean;
   selectedColor: string;
@@ -69,8 +54,6 @@ interface UseDashboardReturn {
   showMinimap: boolean;
   canvasBackgroundColor: string;
   lastPoint: Point | null;
-
-  // Setters
   setSelectedColor: React.Dispatch<React.SetStateAction<string>>;
   setIsEraserEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   setViewport: React.Dispatch<React.SetStateAction<ViewPort>>;
@@ -80,8 +63,6 @@ interface UseDashboardReturn {
   setShowMinimap: React.Dispatch<React.SetStateAction<boolean>>;
   setBrushType: React.Dispatch<React.SetStateAction<BrushType>>;
   setCanvasBackgroundColor: React.Dispatch<React.SetStateAction<string>>;
-  
-  // Methods
   handleKeyDown: (e: KeyboardEvent) => void;
   handleKeyUp: (e: KeyboardEvent) => void;
   handleResize: () => void;
@@ -93,16 +74,12 @@ interface UseDashboardReturn {
   restoreCanvasState: (imageData: string) => void;
   resetCanvas: () => void;
   sendData: () => Promise<void>;
-  
-  // Drawing methods
   handleMouseDown: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleMouseMove: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleMouseUp: () => void;
   handleMouseOut: () => void;
   handleWheel: (e: React.WheelEvent<HTMLCanvasElement>) => void;
   handleContextMenu: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  
-  // Navigation methods
   handleZoom: (zoomIn: boolean) => void;
   zoomToPoint: (newZoom: number, x: number, y: number) => void;
   panBy: (dx: number, dy: number) => void;
@@ -113,7 +90,6 @@ interface UseDashboardReturn {
   getCursor: () => string;
 }
 
-// Constants
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
 const ZOOM_SENSITIVITY = 0.001;
@@ -122,14 +98,14 @@ const DEFAULT_VIEWPORT: ViewPort = { x: 0, y: 0, zoom: 1 };
 
 export const useDashboard = (): UseDashboardReturn => {
   // Refs
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const minimapRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const minimapRef = useRef<HTMLCanvasElement>(null);
   const previousToolRef = useRef<Tool>('draw');
 
   // Canvas state
   const [canvasDimensions, setCanvasDimensions] = useState<CanvasDimensions>({
-    width: 1024,  // Default width
-    height: 768   // Default height
+    width: typeof window !== "undefined" ? window.innerWidth : 800,
+    height: typeof window !== "undefined" ? window.innerHeight : 600
   });
   const [isDrawing, setIsDrawing] = useState(false);
   const [selectedColor, setSelectedColor] = useState("tomato");
@@ -145,14 +121,14 @@ export const useDashboard = (): UseDashboardReturn => {
   const [error, setError] = useState<string | null>(null);
 
   // LaTeX state
-  const [latexPosition, setLatexPosition] = useState({ x: 10, y: 200 });
+  const [latexPosition, setLatexPosition] = useState<Point>({ x: 10, y: 200 });
   const [latexExpression, setLatexExpression] = useState<Array<string>>([]);
   const [isErasing, setIsErasing] = useState(false);
   const [draggingLatex, setDraggingLatex] = useState<string | null>(null);
 
   // Tools state
   const [isEraserEnabled, setIsEraserEnabled] = useState(false);
-  const [tool, setToolState] = useState<Tool>('draw');
+  const [tool, setToolInternal] = useState<Tool>('draw');
   const [isHandTool, setIsHandTool] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
 
@@ -168,22 +144,12 @@ export const useDashboard = (): UseDashboardReturn => {
   const [gridSize, setGridSize] = useState(20);
   const [showMinimap, setShowMinimap] = useState(true);
 
-  // Initialize dimensions on client-side only
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setCanvasDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
-    }
-  }, []);
-
   // Initialize canvas and event listeners
   useEffect(() => {
     initializeCanvas();
     window.addEventListener("resize", handleResize);
-    window.addEventListener("keydown", handleKeyDown as unknown as EventListener);
-    window.addEventListener("keyup", handleKeyUp as unknown as EventListener);
+    window.addEventListener("keydown", handleKeyDown as EventListener);
+    window.addEventListener("keyup", handleKeyUp as EventListener);
 
     setCenterPoint({
       x: window.innerWidth / 2,
@@ -192,9 +158,10 @@ export const useDashboard = (): UseDashboardReturn => {
 
     return () => {
       window.removeEventListener("resize", handleResize);
-      window.removeEventListener("keydown", handleKeyDown as unknown as EventListener);
-      window.removeEventListener("keyup", handleKeyUp as unknown as EventListener);
+      window.removeEventListener("keydown", handleKeyDown as EventListener);
+      window.removeEventListener("keyup", handleKeyUp as EventListener);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Re-initialize canvas when canvasRef changes (like after remount)
@@ -202,6 +169,7 @@ export const useDashboard = (): UseDashboardReturn => {
     if (canvasRef.current) {
       initializeCanvas();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasRef.current, selectedColor, canvasBackgroundColor]);
 
   // Handle canvas reset
@@ -213,75 +181,8 @@ export const useDashboard = (): UseDashboardReturn => {
       setVariable({});
       setReset(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reset]);
-
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handleKeyPress = (event: KeyboardEvent) => {
-      // Don't trigger shortcuts if user is typing in an input field
-      if (event.target instanceof HTMLInputElement || 
-          event.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      switch (event.key.toLowerCase()) {
-        case 'd':
-          event.preventDefault();
-          setTool('draw');
-          break;
-        case 's':
-          event.preventDefault();
-          setTool('select');
-          break;
-        case 'h':
-          event.preventDefault();
-          setTool('hand');
-          break;
-        case 't':
-          event.preventDefault();
-          setTool('text');
-          break;
-        case 'e':
-          event.preventDefault();
-          toggleEraser();
-          break;
-        case 'z':
-          if (event.ctrlKey || event.metaKey) {
-            event.preventDefault();
-            if (event.shiftKey) {
-              redo();
-            } else {
-              undo();
-            }
-          }
-          break;
-        case 'r':
-          if (event.ctrlKey || event.metaKey) {
-            event.preventDefault();
-            resetCanvas();
-          }
-          break;
-        case '=':
-        case '+':
-          event.preventDefault();
-          handleZoom(true);
-          break;
-        case '-':
-          event.preventDefault();
-          handleZoom(false);
-          break;
-        case '0':
-          if (event.ctrlKey || event.metaKey) {
-            event.preventDefault();
-            centerCanvas();
-          }
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, []);
 
   // CANVAS INITIALIZATION
   const initializeCanvas = () => {
@@ -292,12 +193,12 @@ export const useDashboard = (): UseDashboardReturn => {
     if (!ctx) return;
 
     // Set canvas size
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    canvas.width = typeof window !== "undefined" ? window.innerWidth : 800;
+    canvas.height = typeof window !== "undefined" ? window.innerHeight : 600;
 
     setCanvasDimensions({
-      width: window.innerWidth,
-      height: window.innerHeight
+      width: canvas.width,
+      height: canvas.height
     });
 
     // Clear and setup canvas
@@ -315,8 +216,8 @@ export const useDashboard = (): UseDashboardReturn => {
     ctx.strokeStyle = selectedColor;
 
     // Pre-configure the context for immediate drawing readiness
-    ctx.save(); // Save the clean state
-    
+    ctx.save();
+
     // Set up drawing properties based on current tool and brush
     if (tool === 'eraser' || isEraserEnabled) {
       ctx.globalCompositeOperation = 'destination-out';
@@ -325,7 +226,7 @@ export const useDashboard = (): UseDashboardReturn => {
     } else {
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = selectedColor;
-      
+
       switch (brushType) {
         case 'pencil':
           ctx.lineWidth = 2;
@@ -345,8 +246,8 @@ export const useDashboard = (): UseDashboardReturn => {
           break;
       }
     }
-    
-    ctx.restore(); // Restore clean state but keep context ready
+
+    ctx.restore();
 
     // Draw simple grid
     drawGrid(ctx);
@@ -355,10 +256,12 @@ export const useDashboard = (): UseDashboardReturn => {
     const initialState = canvas.toDataURL();
     setHistory([initialState]);
     setCurrentStep(0);
-    
+
     // Force canvas to be immediately interactive
-    canvas.focus();
-    
+    if (typeof canvas.focus === "function") {
+      canvas.focus();
+    }
+
     // Trigger a small invisible operation to "wake up" the canvas
     ctx.save();
     ctx.globalAlpha = 0;
@@ -370,11 +273,9 @@ export const useDashboard = (): UseDashboardReturn => {
   };
 
   const drawGrid = (ctx: CanvasRenderingContext2D) => {
-    // Fill background
     ctx.fillStyle = canvasBackgroundColor;
     ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    // Simple dot grid
     const gridSpacing = 30;
     const dotSize = 1;
     const isLight = canvasBackgroundColor === '#ffffff' || canvasBackgroundColor === '#fff';
@@ -391,7 +292,6 @@ export const useDashboard = (): UseDashboardReturn => {
     }
   };
 
-  // DRAWING METHODS - COMPLETELY NEW SIMPLE SYSTEM
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -400,19 +300,15 @@ export const useDashboard = (): UseDashboardReturn => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    if (tool === 'hand' || e.buttons === 2 || (e.buttons === 1 && e.altKey)) {
-      // Start panning
+    if (tool === 'hand' || e.button === 2 || (e.button === 0 && e.altKey)) {
       setIsPanning(true);
       setLastPanPoint({ x: e.clientX, y: e.clientY });
     } else if (tool === 'draw' || tool === 'eraser') {
-      // Start drawing
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Get pressure (for supported devices)
       const pressure = (e as any).pressure || 1;
 
-      // Set drawing properties with pressure sensitivity
       if (tool === 'eraser' || isEraserEnabled) {
         ctx.globalCompositeOperation = 'destination-out';
         ctx.lineWidth = 20 * pressure;
@@ -420,7 +316,7 @@ export const useDashboard = (): UseDashboardReturn => {
       } else {
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = selectedColor;
-        
+
         switch (brushType) {
           case 'pencil':
             ctx.lineWidth = Math.max(1, 2 * pressure);
@@ -446,18 +342,16 @@ export const useDashboard = (): UseDashboardReturn => {
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // Start drawing path and draw a small dot at the start position
       ctx.beginPath();
       ctx.moveTo(x, y);
-      
-      // Draw a small circle at start for immediate feedback
+
+      ctx.beginPath();
       ctx.arc(x, y, ctx.lineWidth / 4, 0, Math.PI * 2);
       ctx.fill();
-      
-      // Start the stroke path
+
       ctx.beginPath();
       ctx.moveTo(x, y);
-      
+
       setIsDrawing(true);
       setLastPoint({ x, y });
     }
@@ -472,7 +366,6 @@ export const useDashboard = (): UseDashboardReturn => {
     const y = e.clientY - rect.top;
 
     if (isPanning && lastPanPoint) {
-      // Handle panning
       const dx = e.clientX - lastPanPoint.x;
       const dy = e.clientY - lastPanPoint.y;
 
@@ -484,28 +377,23 @@ export const useDashboard = (): UseDashboardReturn => {
 
       setLastPanPoint({ x: e.clientX, y: e.clientY });
     } else if (isDrawing && lastPoint) {
-      // Handle drawing with smooth interpolation
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      // Calculate distance for smoothing
       const dx = x - lastPoint.x;
       const dy = y - lastPoint.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      // Only draw if there's movement to avoid duplicate dots
       if (distance > 0.5) {
-        // Use quadratic curve for smoother lines
         const midX = (lastPoint.x + x) / 2;
         const midY = (lastPoint.y + y) / 2;
-        
+
         ctx.quadraticCurveTo(lastPoint.x, lastPoint.y, midX, midY);
         ctx.stroke();
-        
-        // Start new path from current position for next segment
+
         ctx.beginPath();
         ctx.moveTo(midX, midY);
-        
+
         setLastPoint({ x, y });
       }
     }
@@ -516,12 +404,11 @@ export const useDashboard = (): UseDashboardReturn => {
       setIsPanning(false);
       setLastPanPoint(null);
     }
-    
+
     if (isDrawing) {
       setIsDrawing(false);
       setLastPoint(null);
-      
-      // Save to history
+
       const canvas = canvasRef.current;
       if (canvas) {
         const imageData = canvas.toDataURL();
@@ -538,19 +425,16 @@ export const useDashboard = (): UseDashboardReturn => {
     e.preventDefault();
   };
 
-  // NAVIGATION METHODS
   const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
 
     if (e.ctrlKey || e.metaKey) {
-      // Zoom
       const delta = -e.deltaY * ZOOM_SENSITIVITY;
       const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, viewport.zoom * (1 + delta)));
       const mouseX = e.nativeEvent.offsetX;
       const mouseY = e.nativeEvent.offsetY;
       zoomToPoint(newZoom, mouseX, mouseY);
     } else {
-      // Pan
       panBy(-e.deltaX * PAN_SENSITIVITY, -e.deltaY * PAN_SENSITIVITY);
     }
   };
@@ -559,7 +443,7 @@ export const useDashboard = (): UseDashboardReturn => {
     const currentZoom = viewport.zoom;
     const zoomStep = zoomIn ? 0.2 : -0.2;
     const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom + zoomStep));
-    
+
     setViewport(prev => ({ ...prev, zoom: newZoom }));
   };
 
@@ -601,29 +485,11 @@ export const useDashboard = (): UseDashboardReturn => {
     }));
   };
 
-  // TOOL METHODS
   const setTool = (newTool: Tool) => {
     if (newTool !== 'eraser') {
       setIsEraserEnabled(false);
     }
-    
-    if (newTool !== 'hand') {
-      setIsHandTool(false);
-    }
-
-    setToolState(newTool);
-    
-    if (tool === 'eraser' || isEraserEnabled) {
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.globalCompositeOperation = 'source-over';
-        }
-      }
-    }
-
-    previousToolRef.current = tool;
+    setToolInternal(newTool);
   };
 
   const toggleEraser = () => {
@@ -643,87 +509,95 @@ export const useDashboard = (): UseDashboardReturn => {
     if (tool !== 'hand') {
       previousToolRef.current = tool;
       setTool('hand');
+      setIsHandTool(true);
     } else {
-      setTool(previousToolRef.current);
+      setTool(previousToolRef.current || 'draw');
+      setIsHandTool(false);
     }
   };
 
-  const getCursor = (): string => {
-    if (tool === 'hand' || isSpacePressed) return 'grab';
-    if (tool === 'eraser' || isEraserEnabled) return 'crosshair';
-    if (tool === 'text') return 'text';
-    if (tool === 'select') return 'default';
-    return 'crosshair'; // default for draw tool
+  const getCursor = () => {
+    if (isSpacePressed || tool === 'hand') {
+      return isPanning ? 'grabbing' : 'grab';
+    }
+
+    switch (tool) {
+      case 'eraser':
+        return "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"white\" stroke=\"white\" stroke-width=\"2\"><path d=\"M19 19H5L17 7l2 2z\"/></svg>') 0 24, auto";
+      default:
+        return 'crosshair';
+    }
   };
 
-  // KEYBOARD HANDLING
   const handleKeyDown = (e: KeyboardEvent) => {
-    // Prevent default for canvas shortcuts
-    const isCanvasFocused = document.activeElement === canvasRef.current;
-    
-    if (isCanvasFocused || e.target === document.body) {
-      switch (e.key.toLowerCase()) {
-        case ' ':
-          if (!isSpacePressed) {
-            setIsSpacePressed(true);
-            previousToolRef.current = tool;
+    if (e.code === 'Space' && !isSpacePressed) {
+      e.preventDefault();
+      setIsSpacePressed(true);
+      previousToolRef.current = tool;
+      setTool('hand');
+    }
+
+    if (e.code === 'KeyE' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      toggleEraser();
+    }
+
+    if (e.ctrlKey || e.metaKey) {
+      switch (e.code) {
+        case 'Equal':
+        case 'NumpadAdd':
+          e.preventDefault();
+          handleZoom(true);
+          break;
+        case 'Minus':
+        case 'NumpadSubtract':
+          e.preventDefault();
+          handleZoom(false);
+          break;
+        case 'Digit0':
+          e.preventDefault();
+          resetZoom();
+          break;
+        case 'KeyZ':
+          if (e.shiftKey) {
             e.preventDefault();
+            redo();
+          } else {
+            e.preventDefault();
+            undo();
           }
           break;
-        case 'd':
-          if (!e.ctrlKey && !e.metaKey) {
-            setTool('draw');
-            e.preventDefault();
-          }
+      }
+    }
+
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      switch (e.code) {
+        case 'KeyD':
+          e.preventDefault();
+          setTool('draw');
           break;
-        case 'h':
-          if (!e.ctrlKey && !e.metaKey) {
-            toggleHandTool();
-            e.preventDefault();
-          }
+        case 'KeyH':
+          e.preventDefault();
+          toggleHandTool();
           break;
-        case 't':
-          if (!e.ctrlKey && !e.metaKey) {
-            setTool('text');
-            e.preventDefault();
-          }
-          break;
-        case 'e':
-          if (!e.ctrlKey && !e.metaKey) {
-            toggleEraser();
-            e.preventDefault();
-          }
-          break;
-        case '1':
+        case 'Digit1':
+          e.preventDefault();
           setBrushType('pencil');
           setTool('draw');
-          e.preventDefault();
           break;
-        case '2':
+        case 'Digit2':
+          e.preventDefault();
           setBrushType('marker');
           setTool('draw');
-          e.preventDefault();
           break;
-        case '3':
+        case 'Digit3':
+          e.preventDefault();
           setBrushType('highlighter');
           setTool('draw');
+          break;
+        case 'KeyT':
           e.preventDefault();
-          break;
-        case 'z':
-          if (e.ctrlKey || e.metaKey) {
-            if (e.shiftKey) {
-              redo();
-            } else {
-              undo();
-            }
-            e.preventDefault();
-          }
-          break;
-        case 'y':
-          if (e.ctrlKey || e.metaKey) {
-            redo();
-            e.preventDefault();
-          }
+          setTool('text');
           break;
       }
     }
@@ -743,7 +617,6 @@ export const useDashboard = (): UseDashboardReturn => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Save current canvas content
     const tempCanvas = document.createElement("canvas");
     const tempCtx = tempCanvas.getContext("2d");
     if (!tempCtx) return;
@@ -752,21 +625,18 @@ export const useDashboard = (): UseDashboardReturn => {
     tempCanvas.height = canvas.height;
     tempCtx.drawImage(canvas, 0, 0);
 
-    // Resize canvas
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    canvas.width = typeof window !== "undefined" ? window.innerWidth : 800;
+    canvas.height = typeof window !== "undefined" ? window.innerHeight : 600;
 
     setCanvasDimensions({
-      width: window.innerWidth,
-      height: window.innerHeight
+      width: canvas.width,
+      height: canvas.height
     });
 
-    // Restore content
     ctx.fillStyle = canvasBackgroundColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(tempCanvas, 0, 0);
-    
-    // Reset drawing properties
+
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.lineWidth = 3;
@@ -775,7 +645,6 @@ export const useDashboard = (): UseDashboardReturn => {
     ctx.strokeStyle = selectedColor;
   };
 
-  // HISTORY METHODS
   const saveToHistory = (imageData: string) => {
     const newHistory = history.slice(0, currentStep + 1);
     newHistory.push(imageData);
@@ -804,7 +673,7 @@ export const useDashboard = (): UseDashboardReturn => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const img = new Image();
+    const img = new window.Image();
     img.onload = () => {
       ctx.fillStyle = canvasBackgroundColor;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -814,7 +683,6 @@ export const useDashboard = (): UseDashboardReturn => {
   };
 
   const resetCanvas = () => {
-    // Reset all state
     setIsDrawing(false);
     setIsErasing(false);
     setIsEraserEnabled(false);
@@ -831,16 +699,13 @@ export const useDashboard = (): UseDashboardReturn => {
     setVariable({});
     setBrushType('pencil');
 
-    // Small delay to ensure state updates, then reinitialize
     setTimeout(() => {
       initializeCanvas();
-      
-      // Ensure canvas is immediately ready for drawing
+
       const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          // Pre-setup drawing properties so first click works immediately
           ctx.lineCap = "round";
           ctx.lineJoin = "round";
           ctx.lineWidth = 3;
@@ -850,36 +715,26 @@ export const useDashboard = (): UseDashboardReturn => {
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = "high";
         }
-        
-        // Ensure canvas has focus for immediate interaction
-        canvas.focus();
+
+        if (typeof canvas.focus === "function") {
+          canvas.focus();
+        }
       }
     }, 50);
   };
 
   const sendData = async () => {
     const canvas = canvasRef.current;
-    if (!canvas) {
-      setError("Canvas not found");
-      return;
-    }
+    if (!canvas) return;
 
     try {
       setIsLoading(true);
       setError(null);
 
-      // Get image data and log its size
       const imageData = canvas.toDataURL("image/png");
-      console.log("Image data length:", imageData.length);
-      console.log("First 100 chars of image data:", imageData.substring(0, 100));
-
-      if (!imageData.startsWith('data:image/png;base64,')) {
-        throw new Error("Invalid image format");
-      }
-
       const response = await axios({
         method: "POST",
-        url: "http://localhost:3000/api/calculate", // Use relative URL
+        url: "http://localhost:3000/api/calculate",
         data: {
           image: imageData,
           variable: variable,
@@ -889,32 +744,20 @@ export const useDashboard = (): UseDashboardReturn => {
         },
       });
 
-      console.log("API Response:", response.data);
-
-      if (response.data.error) {
-        throw new Error(response.data.error);
-      }
-
       const generatedResult: GeneratedResult = response.data;
       setResult(generatedResult);
-    } catch (err) {
-      console.error("Error sending data:", err);
-      setError(
-        err instanceof Error 
-          ? err.message 
-          : "Failed to process the mathematical expression"
-      );
+    } catch (err: any) {
+      setError(err?.message || "An error occurred");
+      // eslint-disable-next-line no-console
+      console.error("Error analyzing image:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
   return {
-    // Refs
     canvasRef,
     minimapRef,
-    
-    // State variables
     canvasDimensions,
     isDrawing,
     selectedColor,
@@ -942,8 +785,6 @@ export const useDashboard = (): UseDashboardReturn => {
     showMinimap,
     canvasBackgroundColor,
     lastPoint,
-    
-    // Setters
     setSelectedColor,
     setIsEraserEnabled,
     setViewport,
@@ -953,8 +794,6 @@ export const useDashboard = (): UseDashboardReturn => {
     setShowMinimap,
     setBrushType,
     setCanvasBackgroundColor,
-    
-    // Methods
     handleKeyDown,
     handleKeyUp,
     handleResize,
