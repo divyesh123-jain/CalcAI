@@ -727,7 +727,7 @@ export const useDashboard = (): UseDashboardReturn => {
       const imageData = canvas.toDataURL("image/png");
       const response = await axios({
         method: "POST",
-        url: "http://localhost:3000/api/calculate",
+        url: "/api/calculate",
         data: {
           image: imageData,
           variable: variable,
