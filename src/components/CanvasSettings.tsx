@@ -2,22 +2,12 @@
 import React, { useState, useRef } from "react";
 import { 
   Settings, 
-  Palette, 
-  Grid3X3, 
+  X, 
   Download, 
-  Upload, 
-  RotateCw, 
-  Layers,
-  Ruler,
-  X,
-  Camera,
-  Share,
-  Save,
-  FileImage,
-  Maximize,
-  Eye,
-  EyeOff,
-  RefreshCw
+  RefreshCw, 
+  Trash2,
+  Grid3X3,
+  Palette
 } from "lucide-react";
 
 interface CanvasSettingsProps {
@@ -151,11 +141,11 @@ const CanvasSettings: React.FC<CanvasSettingsProps> = ({
           {[
             { id: 'appearance', label: 'Appearance', icon: Palette },
             { id: 'export', label: 'Export & Import', icon: Download },
-            { id: 'advanced', label: 'Advanced', icon: Layers }
+            { id: 'advanced', label: 'Advanced', icon: Grid3X3 }
           ].map(({ id, label, icon: Icon }) => (
             <button
               key={id}
-              onClick={() => setActiveTab(id as any)}
+              onClick={() => setActiveTab(id as 'appearance' | 'export' | 'advanced')}
               className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 transition-all ${
                 activeTab === id
                   ? 'bg-cyan-500/20 text-cyan-300 border-b-2 border-cyan-500'
@@ -251,13 +241,13 @@ const CanvasSettings: React.FC<CanvasSettingsProps> = ({
                 </h3>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { format: 'png', label: 'PNG', icon: FileImage, desc: 'High quality' },
-                    { format: 'jpg', label: 'JPG', icon: Camera, desc: 'Smaller size' },
-                    { format: 'svg', label: 'SVG', icon: Maximize, desc: 'Vector format' }
+                    { format: 'png', label: 'PNG', icon: Trash2, desc: 'High quality' },
+                    { format: 'jpg', label: 'JPG', icon: Grid3X3, desc: 'Smaller size' },
+                    { format: 'svg', label: 'SVG', icon: Grid3X3, desc: 'Vector format' }
                   ].map(({ format, label, icon: Icon, desc }) => (
                     <button
                       key={format}
-                      onClick={() => exportCanvas(format as any)}
+                      onClick={() => exportCanvas(format as 'png' | 'jpg' | 'svg')}
                       className="p-4 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all group"
                     >
                       <Icon className="w-6 h-6 text-emerald-400 mx-auto mb-2 group-hover:scale-110 transition-transform" />
@@ -271,7 +261,7 @@ const CanvasSettings: React.FC<CanvasSettingsProps> = ({
               {/* Quick Actions */}
               <div>
                 <h3 className="text-white font-medium mb-4 flex items-center gap-2">
-                  <Share className="w-4 h-4 text-blue-400" />
+                  <Grid3X3 className="w-4 h-4 text-blue-400" />
                   Quick Actions
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -279,7 +269,7 @@ const CanvasSettings: React.FC<CanvasSettingsProps> = ({
                     onClick={copyCanvasToClipboard}
                     className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
                   >
-                    <Save className="w-5 h-5 text-blue-400" />
+                    <Grid3X3 className="w-5 h-5 text-blue-400" />
                     <div>
                       <div className="text-white font-medium text-left">Copy to Clipboard</div>
                       <div className="text-white/60 text-xs text-left">Copy as image</div>
@@ -289,7 +279,7 @@ const CanvasSettings: React.FC<CanvasSettingsProps> = ({
                     onClick={() => fileInputRef.current?.click()}
                     className="flex items-center gap-3 p-3 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
                   >
-                    <Upload className="w-5 h-5 text-orange-400" />
+                    <Grid3X3 className="w-5 h-5 text-orange-400" />
                     <div>
                       <div className="text-white font-medium text-left">Import Image</div>
                       <div className="text-white/60 text-xs text-left">Add to canvas</div>
@@ -314,7 +304,7 @@ const CanvasSettings: React.FC<CanvasSettingsProps> = ({
               {/* Canvas Actions */}
               <div>
                 <h3 className="text-white font-medium mb-4 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-yellow-400" />
+                  <Grid3X3 className="w-4 h-4 text-yellow-400" />
                   Canvas Actions
                 </h3>
                 <div className="space-y-3">
@@ -334,7 +324,7 @@ const CanvasSettings: React.FC<CanvasSettingsProps> = ({
               {/* Performance Info */}
               <div>
                 <h3 className="text-white font-medium mb-4 flex items-center gap-2">
-                  <Ruler className="w-4 h-4 text-green-400" />
+                  <Grid3X3 className="w-4 h-4 text-green-400" />
                   Canvas Info
                 </h3>
                 <div className="space-y-2 p-4 rounded-lg bg-white/5 border border-white/10">

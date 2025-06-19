@@ -25,8 +25,8 @@ interface CanvasDimensions {
 }
 
 interface UseDashboardReturn {
-  canvasRef: React.RefObject<HTMLCanvasElement>;
-  minimapRef: React.RefObject<HTMLCanvasElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  minimapRef: React.RefObject<HTMLCanvasElement | null>;
   canvasDimensions: CanvasDimensions;
   isDrawing: boolean;
   selectedColor: string;
@@ -98,8 +98,8 @@ const DEFAULT_VIEWPORT: ViewPort = { x: 0, y: 0, zoom: 1 };
 
 export const useDashboard = (): UseDashboardReturn => {
   // Refs
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const minimapRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const minimapRef = useRef<HTMLCanvasElement | null>(null);
   const previousToolRef = useRef<Tool>('draw');
 
   // Canvas state
@@ -120,11 +120,8 @@ export const useDashboard = (): UseDashboardReturn => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // LaTeX state
-  const [latexPosition, setLatexPosition] = useState<Point>({ x: 10, y: 200 });
-  const [latexExpression, setLatexExpression] = useState<Array<string>>([]);
-  const [isErasing, setIsErasing] = useState(false);
-  const [draggingLatex, setDraggingLatex] = useState<string | null>(null);
+  // Latex expression state
+  const [latexExpression, setLatexExpression] = useState<string[]>([]);
 
   // Tools state
   const [isEraserEnabled, setIsEraserEnabled] = useState(false);
@@ -141,7 +138,6 @@ export const useDashboard = (): UseDashboardReturn => {
   const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
   const [isPanning, setIsPanning] = useState(false);
   const [centerPoint, setCenterPoint] = useState<Point>({ x: 0, y: 0 });
-  const [gridSize, setGridSize] = useState(20);
   const [showMinimap, setShowMinimap] = useState(true);
 
   // Initialize canvas and event listeners
@@ -496,12 +492,10 @@ export const useDashboard = (): UseDashboardReturn => {
     if (tool === 'eraser' || isEraserEnabled) {
       setTool('draw');
       setIsEraserEnabled(false);
-      setIsErasing(false);
     } else {
       previousToolRef.current = tool;
       setTool('eraser');
       setIsEraserEnabled(true);
-      setIsErasing(true);
     }
   };
 
@@ -684,7 +678,6 @@ export const useDashboard = (): UseDashboardReturn => {
 
   const resetCanvas = () => {
     setIsDrawing(false);
-    setIsErasing(false);
     setIsEraserEnabled(false);
     setTool('draw');
     setIsPanning(false);
@@ -748,7 +741,6 @@ export const useDashboard = (): UseDashboardReturn => {
       setResult(generatedResult);
     } catch (err: any) {
       setError(err?.message || "An error occurred");
-      // eslint-disable-next-line no-console
       console.error("Error analyzing image:", err);
     } finally {
       setIsLoading(false);
@@ -766,10 +758,10 @@ export const useDashboard = (): UseDashboardReturn => {
     variable,
     isLoading,
     error,
-    latexPosition,
+    latexPosition: { x: 0, y: 0 },
     latexExpression,
-    isErasing,
-    draggingLatex,
+    isErasing: false,
+    draggingLatex: null,
     isEraserEnabled,
     history,
     currentStep,
@@ -781,7 +773,7 @@ export const useDashboard = (): UseDashboardReturn => {
     tool,
     brushType,
     centerPoint,
-    gridSize,
+    gridSize: 20,
     showMinimap,
     canvasBackgroundColor,
     lastPoint,

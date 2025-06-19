@@ -49,34 +49,91 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 
 
   useEffect(() => {
-    initializeCanvas();
-    if (minimapRef.current) {
-      const minimapCtx = minimapRef.current.getContext('2d');
-      if (minimapCtx) {
-        minimapCtx.fillStyle = 'black';
-        minimapCtx.fillRect(0, 0, minimapRef.current.width, minimapRef.current.height);
+    const initializeCanvas = () => {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+
+          ctx.fillStyle = "black";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          drawGrid(ctx);
+        }
       }
-    }
-     requestAnimationFrame(() => {
+    };
+
+    const updateCanvas = (preserveDrawings = false) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Store the current drawings if needed
+      let currentDrawings;
+      if (preserveDrawings && drawingHistory) {
+        currentDrawings = drawingHistory;
+      }
+
+      // Clear canvas
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Apply viewport transform
+      ctx.save();
+      ctx.translate(viewport.x, viewport.y);
+      ctx.scale(viewport.zoom, viewport.zoom);
+
+      // Draw grid
+      const gridSize = 20;
+      const viewportWidth = canvas.width / viewport.zoom;
+      const viewportHeight = canvas.height / viewport.zoom;
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 1 / viewport.zoom;
+
+      // Calculate grid boundaries
+      const startX = Math.floor(-viewport.x / viewport.zoom / gridSize) * gridSize;
+      const startY = Math.floor(-viewport.y / viewport.zoom / gridSize) * gridSize;
+      const endX = startX + viewportWidth + gridSize;
+      const endY = startY + viewportHeight + gridSize;
+
+      // Draw vertical lines
+      for (let x = startX; x <= endX; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, startY);
+        ctx.lineTo(x, endY);
+        ctx.stroke();
+      }
+
+      // Draw horizontal lines
+      for (let y = startY; y <= endY; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(startX, y);
+        ctx.lineTo(endX, y);
+        ctx.stroke();
+      }
+
+      // Restore drawings if needed
+      if (preserveDrawings && currentDrawings) {
+        ctx.putImageData(currentDrawings, 0, 0);
+      }
+
+      ctx.restore();
+
+      // Update minimap
+      updateMinimap(preserveDrawings);
+    };
+    
+    initializeCanvas();
+    
+    requestAnimationFrame(() => {
       updateCanvas(true);
     });
-  }, []);
-
-  const initializeCanvas = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-
-        ctx.fillStyle = "black";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        drawGrid(ctx);
-      }
-    }
-  };
+  }, [viewport, drawingHistory, updateMinimap]);
 
   const drawGrid = (ctx: CanvasRenderingContext2D) => {
     const { x, y, zoom } = viewport;
@@ -98,69 +155,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
       }
     }
      updateMinimap();
-  };
-
-  const updateCanvas = (preserveDrawings = false) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Store the current drawings if needed
-    let currentDrawings;
-    if (preserveDrawings && drawingHistory) {
-      currentDrawings = drawingHistory;
-    }
-
-    // Clear canvas
-    ctx.fillStyle = 'black';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Apply viewport transform
-    ctx.save();
-    ctx.translate(viewport.x, viewport.y);
-    ctx.scale(viewport.zoom, viewport.zoom);
-
-    // Draw grid
-    const gridSize = 20;
-    const viewportWidth = canvas.width / viewport.zoom;
-    const viewportHeight = canvas.height / viewport.zoom;
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-    ctx.lineWidth = 1 / viewport.zoom;
-
-    // Calculate grid boundaries
-    const startX = Math.floor(-viewport.x / viewport.zoom / gridSize) * gridSize;
-    const startY = Math.floor(-viewport.y / viewport.zoom / gridSize) * gridSize;
-    const endX = startX + viewportWidth + gridSize;
-    const endY = startY + viewportHeight + gridSize;
-
-    // Draw vertical lines
-    for (let x = startX; x <= endX; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, startY);
-      ctx.lineTo(x, endY);
-      ctx.stroke();
-    }
-
-    // Draw horizontal lines
-    for (let y = startY; y <= endY; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(startX, y);
-      ctx.lineTo(endX, y);
-      ctx.stroke();
-    }
-
-    // Restore drawings if needed
-    if (preserveDrawings && currentDrawings) {
-      ctx.putImageData(currentDrawings, 0, 0);
-    }
-
-    ctx.restore();
-
-    // Update minimap
-    updateMinimap(preserveDrawings);
   };
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {

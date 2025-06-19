@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Activity, TrendingUp, Zap, Eye, EyeOff } from "lucide-react";
+import { Activity, TrendingUp, Zap, EyeOff } from "lucide-react";
 
 interface PerformanceMonitorProps {
   isDrawing?: boolean;
@@ -72,7 +72,7 @@ const PerformanceMonitor: React.FC<PerformanceMonitorProps> = ({
     
     const memoryInterval = setInterval(() => {
       if ('memory' in performance) {
-        const memory = (performance as any).memory;
+        const memory = (performance as unknown as { memory: { usedJSHeapSize: number } }).memory;
         setMemoryUsage(Math.round(memory.usedJSHeapSize / 1048576)); // Convert to MB
       }
     }, 2000); // Check every 2 seconds instead of every frame

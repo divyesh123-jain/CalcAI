@@ -1,6 +1,5 @@
 "use client";
 import React, { useState } from "react";
-import { ColorPalette } from "../lib/types";
 import { Palette, X, Check } from "lucide-react";
 
 interface ColorPickerProps {

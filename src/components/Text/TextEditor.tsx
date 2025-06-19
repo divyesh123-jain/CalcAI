@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { TextElement, TextStyle } from '../../lib/types';
-import { Trash2, RotateCw } from 'lucide-react';
 
 interface TextEditorProps {
   textElement: TextElement;

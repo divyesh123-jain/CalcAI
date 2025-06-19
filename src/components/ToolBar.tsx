@@ -1,6 +1,6 @@
 // components/Toolbar.tsx
 "use client";
-import React, { useState } from "react";
+import React from "react";
 import { Button } from "./ui/button";
 import { BrushType, Tool } from "../lib/types";
 import { 
@@ -20,12 +20,9 @@ import {
   Brush,
   Settings,
   Palette,
-  Eye,
-  EyeOff,
-  Sparkles,
   Activity
 } from "lucide-react";
-import { FaEraser, FaHandPaper, FaPencilAlt, FaFont } from "react-icons/fa";
+import { FaFont } from "react-icons/fa";
 
 interface ToolbarProps {
   isLoading: boolean;
@@ -51,13 +48,6 @@ interface ToolbarProps {
   onToggleCanvasSettings?: () => void;
 }
 
-const tools = [
-  { id: 'draw', icon: FaPencilAlt, tooltip: 'Draw (D)' },
-  { id: 'hand', icon: FaHandPaper, tooltip: 'Hand Tool (H)' },
-  { id: 'eraser', icon: FaEraser, tooltip: 'Eraser (E)' },
-  { id: 'text', icon: FaFont, tooltip: 'Text (T)' },
-] as const;
-
 const Toolbar: React.FC<ToolbarProps> = ({
   isLoading,
   isEraserEnabled,
@@ -81,8 +71,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onToggleColorPicker,
   onToggleCanvasSettings,
 }) => {
-  const [showSettings, setShowSettings] = useState(false);
-
   const ToolButton = ({ 
     icon: Icon, 
     label, 
@@ -92,7 +80,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     className = "",
     badge = null
   }: {
-    icon: React.ComponentType<any>;
+    icon: React.ComponentType<{ className?: string }>;
     label: string;
     onClick: () => void;
     isActive?: boolean;

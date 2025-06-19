@@ -1,12 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// components/Canvas.tsx - SIMPLIFIED SINGLE CANVAS
 "use client";
 import React, { useEffect } from "react";
-
-interface Point {
-  x: number;
-  y: number;
-}
 
 interface ViewPort {
   x: number;

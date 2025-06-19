@@ -204,6 +204,7 @@ const Minimap: React.FC<MinimapProps> = ({
     if (!isDragging) return;
     handleViewportMove(e);
     e.preventDefault();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDragging]);
 
   const handleMouseUp = useCallback(() => {
