@@ -15,6 +15,7 @@ interface CanvasProps {
   handleMouseOut: () => void;
   handleWheel: (e: React.WheelEvent<HTMLCanvasElement>) => void;
   handleContextMenu: (e: React.MouseEvent<HTMLCanvasElement>) => void;
+  handleDoubleClick?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   getCursor: () => string;
   viewport: ViewPort;
 }
@@ -27,6 +28,7 @@ const Canvas: React.FC<CanvasProps> = ({
   handleMouseOut,
   handleWheel,
   handleContextMenu,
+  handleDoubleClick,
   getCursor,
   viewport,
 }) => {
@@ -36,6 +38,13 @@ const Canvas: React.FC<CanvasProps> = ({
       canvasRef.current.focus();
     }
   }, [canvasRef]);
+
+  const onDoubleClickWrapper = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    console.log('Canvas double-click wrapper triggered');
+    if (handleDoubleClick) {
+      handleDoubleClick(e);
+    }
+  };
 
   return (
     <div className="absolute inset-0 overflow-hidden">
@@ -49,6 +58,7 @@ const Canvas: React.FC<CanvasProps> = ({
         onMouseOut={handleMouseOut}
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
+        onDoubleClick={onDoubleClickWrapper}
         tabIndex={0}  // Make canvas focusable
         autoFocus     // Auto-focus the canvas
         style={{ 

@@ -78,6 +78,7 @@ export default function DashboardComponent() {
     handleMouseOut,
     handleWheel,
     handleContextMenu,
+    handleDoubleClick,
     getCursor,
   } = useDashboard();
 
@@ -151,6 +152,7 @@ export default function DashboardComponent() {
     handleMouseOut,
     handleWheel,
     handleContextMenu,
+    handleDoubleClick,
     getCursor,
     viewport,
   };

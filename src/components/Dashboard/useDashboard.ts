@@ -81,6 +81,7 @@ interface UseDashboardReturn {
   handleMouseOut: () => void;
   handleWheel: (e: React.WheelEvent<HTMLCanvasElement>) => void;
   handleContextMenu: (e: React.MouseEvent<HTMLCanvasElement>) => void;
+  handleDoubleClick: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleZoom: (zoomIn: boolean) => void;
   zoomToPoint: (newZoom: number, x: number, y: number) => void;
   panBy: (dx: number, dy: number) => void;
@@ -134,19 +135,52 @@ export const useDashboard = (): UseDashboardReturn => {
   const [history, setHistory] = useState<string[]>([]);
   const [currentStep, setCurrentStep] = useState(-1);
 
-  // Viewport state
+  // Viewport state - simplified
   const [viewport, setViewport] = useState<ViewPort>(DEFAULT_VIEWPORT);
   const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+
+  // Smooth panning state - simplified
+  const [isSmoothPanning, setIsSmoothPanning] = useState(false);
+  const smoothPanAnimationRef = useRef<number | null>(null);
+  const targetViewportRef = useRef<ViewPort | null>(null);
+  const startViewportRef = useRef<ViewPort | null>(null);
+  const animationStartTimeRef = useRef<number>(0);
+
   const [centerPoint, setCenterPoint] = useState<Point>({ x: 0, y: 0 });
   const [showMinimap, setShowMinimap] = useState(true);
+
+  // Store drawing operations for real-time rendering
+  const [drawingOperations, setDrawingOperations] = useState<Array<{
+    type: 'stroke' | 'dot';
+    points: Point[];
+    style: {
+      color: string;
+      lineWidth: number;
+      tool: string;
+    };
+  }>>([]);
+  const currentStrokeRef = useRef<Point[]>([]);
 
   // Initialize canvas and event listeners
   useEffect(() => {
     initializeCanvas();
-    window.addEventListener("resize", handleResize);
-    window.addEventListener("keydown", handleKeyDown as EventListener);
-    window.addEventListener("keyup", handleKeyUp as EventListener);
+
+    const handleKeyDownEvent = (e: KeyboardEvent) => {
+      handleKeyDown(e);
+    };
+
+    const handleKeyUpEvent = (e: KeyboardEvent) => {
+      handleKeyUp(e);
+    };
+
+    const handleResizeEvent = () => {
+      handleResize();
+    };
+
+    window.addEventListener("keydown", handleKeyDownEvent);
+    window.addEventListener("keyup", handleKeyUpEvent);
+    window.addEventListener("resize", handleResizeEvent);
 
     setCenterPoint({
       x: window.innerWidth / 2,
@@ -154,11 +188,13 @@ export const useDashboard = (): UseDashboardReturn => {
     });
 
     return () => {
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("keydown", handleKeyDown as EventListener);
-      window.removeEventListener("keyup", handleKeyUp as EventListener);
+      window.removeEventListener("keydown", handleKeyDownEvent);
+      window.removeEventListener("keyup", handleKeyUpEvent);
+      window.removeEventListener("resize", handleResizeEvent);
+      if (smoothPanAnimationRef.current) {
+        cancelAnimationFrame(smoothPanAnimationRef.current);
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Re-initialize canvas when canvasRef changes (like after remount)
@@ -181,7 +217,7 @@ export const useDashboard = (): UseDashboardReturn => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reset]);
 
-  // CANVAS INITIALIZATION
+  // SIMPLE CANVAS INITIALIZATION
   const initializeCanvas = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -190,96 +226,40 @@ export const useDashboard = (): UseDashboardReturn => {
     if (!ctx) return;
 
     // Set canvas size
-    canvas.width = typeof window !== "undefined" ? window.innerWidth : 800;
-    canvas.height = typeof window !== "undefined" ? window.innerHeight : 600;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
     setCanvasDimensions({
       width: canvas.width,
       height: canvas.height
     });
 
-    // Clear and setup canvas
-    ctx.fillStyle = canvasBackgroundColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Set ALL drawing properties immediately so canvas is ready
+    // Set drawing properties
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
-    ctx.lineWidth = 3;
-    ctx.globalCompositeOperation = "source-over";
-    ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    ctx.strokeStyle = selectedColor;
 
-    // Pre-configure the context for immediate drawing readiness
-    ctx.save();
-
-    // Set up drawing properties based on current tool and brush
-    if (tool === 'eraser' || isEraserEnabled) {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = 20;
-      ctx.globalAlpha = 1;
-    } else {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = selectedColor;
-
-      switch (brushType) {
-        case 'pencil':
-          ctx.lineWidth = 2;
-          ctx.globalAlpha = 0.9;
-          break;
-        case 'marker':
-          ctx.lineWidth = 8;
-          ctx.globalAlpha = 0.9;
-          break;
-        case 'highlighter':
-          ctx.lineWidth = 15;
-          ctx.globalAlpha = 0.4;
-          break;
-        default:
-          ctx.lineWidth = 3;
-          ctx.globalAlpha = 1;
-          break;
-      }
-    }
-
-    ctx.restore();
-
-    // Draw simple grid
-    drawGrid(ctx);
+    // Initial render
+    redrawEverythingFast();
 
     // Initialize history
     const initialState = canvas.toDataURL();
     setHistory([initialState]);
     setCurrentStep(0);
 
-    // Force canvas to be immediately interactive
-    if (typeof canvas.focus === "function") {
-      canvas.focus();
-    }
-
-    // Trigger a small invisible operation to "wake up" the canvas
-    ctx.save();
-    ctx.globalAlpha = 0;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0.1, 0.1);
-    ctx.stroke();
-    ctx.restore();
+    console.log('Canvas initialized:', { width: canvas.width, height: canvas.height });
   };
 
-  const drawGrid = (ctx: CanvasRenderingContext2D) => {
-    ctx.fillStyle = canvasBackgroundColor;
-    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-    const gridSpacing = 30;
-    const dotSize = 1;
-    const isLight = canvasBackgroundColor === '#ffffff' || canvasBackgroundColor === '#fff';
-    const gridColor = isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)';
-
-    ctx.fillStyle = gridColor;
-
+  // Simple grid that doesn't interfere with anything
+  const drawSimpleGrid = (ctx: CanvasRenderingContext2D) => {
+    const gridSpacing = 50;
+    const dotSize = 2;
+    
+    ctx.save();
+    ctx.fillStyle = canvasBackgroundColor === '#000000' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+    
+    // Simple static grid
     for (let x = gridSpacing; x < ctx.canvas.width; x += gridSpacing) {
       for (let y = gridSpacing; y < ctx.canvas.height; y += gridSpacing) {
         ctx.beginPath();
@@ -287,9 +267,14 @@ export const useDashboard = (): UseDashboardReturn => {
         ctx.fill();
       }
     }
+    ctx.restore();
   };
 
+  // SIMPLIFIED MOUSE HANDLING
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    console.log('=== MOUSE DOWN ===');
+    console.log('Tool:', tool, 'Button:', e.button);
+    
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -297,120 +282,223 @@ export const useDashboard = (): UseDashboardReturn => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    console.log('Click position:', { x, y });
+
+    // Stop any smooth panning
+    if (isSmoothPanning) {
+      cancelAnimationFrame(smoothPanAnimationRef.current!);
+      setIsSmoothPanning(false);
+    }
+
     if (tool === 'hand' || e.button === 2 || (e.button === 0 && e.altKey)) {
+      console.log('STARTING PANNING');
       setIsPanning(true);
       setLastPanPoint({ x: e.clientX, y: e.clientY });
+      e.preventDefault();
     } else if (tool === 'draw' || tool === 'eraser') {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      const pressure = (e as any).pressure || 1;
-
-      if (tool === 'eraser' || isEraserEnabled) {
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.lineWidth = 20 * pressure;
-        ctx.globalAlpha = 1;
-      } else {
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = selectedColor;
-
-        switch (brushType) {
-          case 'pencil':
-            ctx.lineWidth = Math.max(1, 2 * pressure);
-            ctx.globalAlpha = 0.8 + (pressure * 0.2);
-            break;
-          case 'marker':
-            ctx.lineWidth = Math.max(3, 8 * pressure);
-            ctx.globalAlpha = 0.9;
-            break;
-          case 'highlighter':
-            ctx.lineWidth = Math.max(5, 15 * pressure);
-            ctx.globalAlpha = 0.4;
-            break;
-          default:
-            ctx.lineWidth = Math.max(2, 3 * pressure);
-            ctx.globalAlpha = 1;
-            break;
-        }
-      }
-
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-
-      ctx.beginPath();
-      ctx.arc(x, y, ctx.lineWidth / 4, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-
-      setIsDrawing(true);
-      setLastPoint({ x, y });
+      console.log('STARTING DRAWING');
+      startDrawing(x, y);
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
     if (isPanning && lastPanPoint) {
       const dx = e.clientX - lastPanPoint.x;
       const dy = e.clientY - lastPanPoint.y;
-
-      setViewport(prev => ({
-        ...prev,
-        x: prev.x + dx,
-        y: prev.y + dy
-      }));
-
+      
+      // Update viewport immediately
+      const newViewport = {
+        ...viewport,
+        x: viewport.x + dx,
+        y: viewport.y + dy
+      };
+      
+      setViewport(newViewport);
       setLastPanPoint({ x: e.clientX, y: e.clientY });
+      
+      // Redraw immediately with new viewport for smooth panning
+      redrawEverythingFast(newViewport);
+      
     } else if (isDrawing && lastPoint) {
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      const dx = x - lastPoint.x;
-      const dy = y - lastPoint.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance > 0.5) {
-        const midX = (lastPoint.x + x) / 2;
-        const midY = (lastPoint.y + y) / 2;
-
-        ctx.quadraticCurveTo(lastPoint.x, lastPoint.y, midX, midY);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(midX, midY);
-
-        setLastPoint({ x, y });
-      }
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      continueDrawing(x, y);
     }
   };
 
   const handleMouseUp = () => {
+    console.log('=== MOUSE UP ===');
+    console.log('Was panning:', isPanning, 'Was drawing:', isDrawing);
+    
     if (isPanning) {
+      console.log('STOPPING PANNING');
       setIsPanning(false);
       setLastPanPoint(null);
     }
 
     if (isDrawing) {
-      setIsDrawing(false);
-      setLastPoint(null);
+      console.log('STOPPING DRAWING');
+      finishDrawing();
+    }
+  };
 
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const imageData = canvas.toDataURL();
-        saveToHistory(imageData);
+  // SIMPLE AND FAST REDRAW - No image loading
+  const redrawEverythingFast = (currentViewport: ViewPort = viewport) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Clear canvas
+    ctx.fillStyle = canvasBackgroundColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw grid
+    drawSimpleGrid(ctx);
+
+    // Apply viewport transformation
+    ctx.save();
+    ctx.translate(currentViewport.x, currentViewport.y);
+    ctx.scale(currentViewport.zoom, currentViewport.zoom);
+
+    // Redraw all drawing operations
+    drawingOperations.forEach(operation => {
+      ctx.save();
+      
+      if (operation.style.tool === 'eraser') {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = operation.style.lineWidth;
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = operation.style.color;
+        ctx.lineWidth = operation.style.lineWidth;
       }
+      
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (operation.type === 'dot' && operation.points.length > 0) {
+        const point = operation.points[0];
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, operation.style.lineWidth / 4, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (operation.type === 'stroke' && operation.points.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(operation.points[0].x, operation.points[0].y);
+        
+        for (let i = 1; i < operation.points.length; i++) {
+          const prevPoint = operation.points[i - 1];
+          const currentPoint = operation.points[i];
+          const midX = (prevPoint.x + currentPoint.x) / 2;
+          const midY = (prevPoint.y + currentPoint.y) / 2;
+          
+          ctx.quadraticCurveTo(prevPoint.x, prevPoint.y, midX, midY);
+        }
+        
+        ctx.stroke();
+      }
+      
+      ctx.restore();
+    });
+
+    ctx.restore();
+  };
+
+  // Updated drawing functions to track operations
+  const startDrawing = (x: number, y: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Convert screen coordinates to world coordinates
+    const worldX = (x - viewport.x) / viewport.zoom;
+    const worldY = (y - viewport.y) / viewport.zoom;
+
+    console.log('Start drawing at world:', { worldX, worldY });
+
+    // Create drawing style
+    const style = {
+      color: selectedColor,
+      lineWidth: tool === 'eraser' ? 20 : (brushType === 'pencil' ? 2 : brushType === 'marker' ? 8 : 15),
+      tool: tool
+    };
+
+    // Add initial dot
+    const dotOperation = {
+      type: 'dot' as const,
+      points: [{ x: worldX, y: worldY }],
+      style
+    };
+    
+    setDrawingOperations(prev => [...prev, dotOperation]);
+    
+    // Start new stroke
+    currentStrokeRef.current = [{ x: worldX, y: worldY }];
+    setIsDrawing(true);
+    setLastPoint({ x: worldX, y: worldY });
+
+    // Redraw immediately
+    redrawEverythingFast();
+  };
+
+  const continueDrawing = (x: number, y: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !lastPoint) return;
+
+    // Convert screen coordinates to world coordinates
+    const worldX = (x - viewport.x) / viewport.zoom;
+    const worldY = (y - viewport.y) / viewport.zoom;
+
+    // Add point to current stroke
+    currentStrokeRef.current.push({ x: worldX, y: worldY });
+    setLastPoint({ x: worldX, y: worldY });
+
+    // Update the last drawing operation (current stroke)
+    setDrawingOperations(prev => {
+      const newOps = [...prev];
+      if (newOps.length > 0) {
+        const lastOp = newOps[newOps.length - 1];
+        if (lastOp.type === 'dot') {
+          // Convert dot to stroke
+          const style = lastOp.style;
+          newOps[newOps.length - 1] = {
+            type: 'stroke',
+            points: [...currentStrokeRef.current],
+            style
+          };
+        } else if (lastOp.type === 'stroke') {
+          // Update existing stroke
+          newOps[newOps.length - 1] = {
+            ...lastOp,
+            points: [...currentStrokeRef.current]
+          };
+        }
+      }
+      return newOps;
+    });
+
+    // Redraw immediately
+    redrawEverythingFast();
+  };
+
+  const finishDrawing = () => {
+    setIsDrawing(false);
+    setLastPoint(null);
+    currentStrokeRef.current = [];
+
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const imageData = canvas.toDataURL();
+      saveToHistory(imageData);
+      console.log('Drawing saved to history');
     }
   };
 
@@ -692,6 +780,7 @@ export const useDashboard = (): UseDashboardReturn => {
     setLatexExpression([]);
     setVariable({});
     setBrushType('pencil');
+    setDrawingOperations([]); // Clear all drawing operations
 
     setTimeout(() => {
       initializeCanvas();
@@ -788,6 +877,116 @@ export const useDashboard = (): UseDashboardReturn => {
     }
   };
 
+  // SIMPLE SMOOTH PANNING
+  const startSmoothPan = (targetX: number, targetY: number) => {
+    console.log('Starting smooth pan to:', { targetX, targetY });
+    
+    if (smoothPanAnimationRef.current) {
+      cancelAnimationFrame(smoothPanAnimationRef.current);
+    }
+
+    startViewportRef.current = { ...viewport };
+    targetViewportRef.current = { ...viewport, x: targetX, y: targetY };
+    animationStartTimeRef.current = Date.now();
+    setIsSmoothPanning(true);
+    
+    animateSmooth();
+  };
+
+  const animateSmooth = () => {
+    if (!startViewportRef.current || !targetViewportRef.current) return;
+
+    const elapsed = Date.now() - animationStartTimeRef.current;
+    const duration = 400; // ms
+    const progress = Math.min(elapsed / duration, 1);
+    
+    // Ease-out animation
+    const easedProgress = 1 - Math.pow(1 - progress, 3);
+    
+    const currentX = startViewportRef.current.x + (targetViewportRef.current.x - startViewportRef.current.x) * easedProgress;
+    const currentY = startViewportRef.current.y + (targetViewportRef.current.y - startViewportRef.current.y) * easedProgress;
+    
+    const newViewport = {
+      ...viewport,
+      x: currentX,
+      y: currentY
+    };
+    
+    setViewport(newViewport);
+
+    // Redraw with new viewport - use fast redraw
+    redrawEverythingFast(newViewport);
+
+    if (progress < 1) {
+      smoothPanAnimationRef.current = requestAnimationFrame(animateSmooth);
+    } else {
+      setIsSmoothPanning(false);
+      startViewportRef.current = null;
+      targetViewportRef.current = null;
+    }
+  };
+
+  // SIMPLE DRAWING DETECTION
+  const hasDrawingAt = (x: number, y: number): boolean => {
+    // Check if any drawing operations have points near the click position
+    const tolerance = 20; // pixels
+    
+    for (const operation of drawingOperations) {
+      for (const point of operation.points) {
+        // Convert world coordinates back to screen coordinates
+        const screenX = point.x * viewport.zoom + viewport.x;
+        const screenY = point.y * viewport.zoom + viewport.y;
+        
+        const distance = Math.sqrt(
+          Math.pow(screenX - x, 2) + Math.pow(screenY - y, 2)
+        );
+        
+        if (distance <= tolerance) {
+          console.log('Found drawing near click position');
+          return true;
+        }
+      }
+    }
+
+    return false;
+  };
+
+  // SIMPLE DOUBLE CLICK HANDLER
+  const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    console.log('=== DOUBLE CLICK ===');
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    console.log('Double-click at:', { x, y });
+
+    // Check if there's a drawing at this position
+    if (hasDrawingAt(x, y)) {
+      console.log('Drawing found! Starting smooth pan to center');
+      
+      // Calculate target to center the clicked point
+      const targetX = window.innerWidth / 2 - x;
+      const targetY = window.innerHeight / 2 - y;
+      
+      startSmoothPan(targetX, targetY);
+      
+      // Switch to hand tool for immediate panning
+      if (tool !== 'hand') {
+        previousToolRef.current = tool;
+        setTool('hand');
+      }
+    } else {
+      console.log('No drawing found at click position');
+    }
+  };
+
+  // Simple grid function for return object
+  const drawGrid = drawSimpleGrid;
+
   return {
     canvasRef,
     minimapRef,
@@ -799,9 +998,9 @@ export const useDashboard = (): UseDashboardReturn => {
     variable,
     isLoading,
     error,
-    latexPosition: { x: 0, y: 0 },
+    latexPosition: centerPoint,
     latexExpression,
-    isErasing: false,
+    isErasing: isEraserEnabled,
     draggingLatex: null,
     isEraserEnabled,
     history,
@@ -844,6 +1043,7 @@ export const useDashboard = (): UseDashboardReturn => {
     handleMouseOut,
     handleWheel,
     handleContextMenu,
+    handleDoubleClick,
     handleZoom,
     zoomToPoint,
     panBy,
