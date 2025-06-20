@@ -775,6 +775,7 @@ export const useDashboard = (): UseDashboardReturn => {
   const resetCanvas = () => {
     console.log('RESET CANVAS');
     
+    // Reset all state first
     setIsDrawing(false);
     setIsEraserEnabled(false);
     setTool('draw');
@@ -790,34 +791,53 @@ export const useDashboard = (): UseDashboardReturn => {
     setVariable({});
     setBrushType('pencil');
     
-    // Reset history completely
-    setCanvasHistory([]);
-    setHistoryIndex(-1);
+    // Clear canvas immediately
+    const canvas = canvasRef.current;
+    if (canvas && typeof window !== "undefined") {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        // Set canvas size
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
 
-    setTimeout(() => {
-      initializeCanvas();
+        setCanvasDimensions({
+          width: canvas.width,
+          height: canvas.height
+        });
 
-      const canvas = canvasRef.current;
-      if (canvas) {
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.lineCap = "round";
-          ctx.lineJoin = "round";
-          ctx.lineWidth = 3;
-          ctx.globalCompositeOperation = "source-over";
-          ctx.globalAlpha = 1;
-          ctx.strokeStyle = selectedColor;
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = "high";
-        }
+        // Set drawing properties
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
 
+        // Clear canvas with background
+        ctx.fillStyle = canvasBackgroundColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw grid
+        drawTransformedGrid(ctx);
+
+        // Focus canvas
         if (typeof canvas.focus === "function") {
           canvas.focus();
         }
       }
-      
-      console.log('Reset complete');
-    }, 50);
+    }
+    
+    // Reset history AFTER clearing canvas - start fresh with single empty state
+    setCanvasHistory([]);
+    setHistoryIndex(-1);
+    
+    // Save the clean empty state as the first history entry
+    setTimeout(() => {
+      if (canvas) {
+        const imageData = canvas.toDataURL();
+        setCanvasHistory([imageData]);
+        setHistoryIndex(0);
+        console.log('Reset complete - history reset to 1/1');
+      }
+    }, 10);
   };
 
   const sendData = async (texts?: Array<{id: string, text: string, x: number, y: number, rotation: number}>, textStyle?: {fontFamily: string, fontSize: number, color: string, opacity: number, fontWeight: string, fontStyle: string}) => {
