@@ -142,13 +142,6 @@ export const useDashboard = (): UseDashboardReturn => {
   const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
   const [isPanning, setIsPanning] = useState(false);
 
-  // Smooth panning
-  const [isSmoothPanning, setIsSmoothPanning] = useState(false);
-  const smoothPanAnimationRef = useRef<number | null>(null);
-  const targetViewportRef = useRef<ViewPort | null>(null);
-  const startViewportRef = useRef<ViewPort | null>(null);
-  const animationStartTimeRef = useRef<number>(0);
-
   const [centerPoint] = useState<Point>({ 
     x: typeof window !== "undefined" ? window.innerWidth / 2 : 400, 
     y: typeof window !== "undefined" ? window.innerHeight / 2 : 300 
@@ -200,6 +193,12 @@ export const useDashboard = (): UseDashboardReturn => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasRef.current, selectedColor, canvasBackgroundColor]);
+
+  // Redraw canvas when viewport changes
+  useEffect(() => {
+    redrawCanvas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport]);
 
   // Handle canvas reset
   useEffect(() => {
@@ -268,7 +267,69 @@ export const useDashboard = (): UseDashboardReturn => {
     ctx.restore();
   };
 
-  // PURE CANVAS DRAWING
+  // Redraw the entire canvas with viewport transformation
+  const redrawCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || typeof window === "undefined") return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Clear canvas
+    ctx.fillStyle = canvasBackgroundColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Apply viewport transformation
+    ctx.save();
+    ctx.translate(viewport.x, viewport.y);
+    ctx.scale(viewport.zoom, viewport.zoom);
+
+    // Draw transformed grid
+    drawTransformedGrid(ctx);
+
+    // Restore the previous drawing if any
+    if (canvasHistory.length > 0 && historyIndex >= 0) {
+      const imageData = canvasHistory[historyIndex];
+      if (imageData) {
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0);
+          ctx.restore();
+        };
+        img.src = imageData;
+        return;
+      }
+    }
+
+    ctx.restore();
+  };
+
+  // Draw grid with viewport transformation
+  const drawTransformedGrid = (ctx: CanvasRenderingContext2D) => {
+    const gridSpacing = 50;
+    const dotSize = 2 / viewport.zoom; // Scale dot size with zoom
+    
+    ctx.save();
+    ctx.fillStyle = canvasBackgroundColor === '#000000' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+    
+    // Calculate visible area in world coordinates
+    const startX = Math.floor(-viewport.x / viewport.zoom / gridSpacing) * gridSpacing;
+    const startY = Math.floor(-viewport.y / viewport.zoom / gridSpacing) * gridSpacing;
+    const endX = startX + (window.innerWidth / viewport.zoom) + gridSpacing * 2;
+    const endY = startY + (window.innerHeight / viewport.zoom) + gridSpacing * 2;
+    
+    // Draw grid dots only in visible area
+    for (let x = startX; x <= endX; x += gridSpacing) {
+      for (let y = startY; y <= endY; y += gridSpacing) {
+        ctx.beginPath();
+        ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  };
+
+  // PURE CANVAS DRAWING WITH VIEWPORT SUPPORT
   const startDrawing = (x: number, y: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -278,25 +339,35 @@ export const useDashboard = (): UseDashboardReturn => {
 
     console.log('Start drawing at:', { x, y });
 
+    // Transform screen coordinates to world coordinates
+    const worldX = (x - viewport.x) / viewport.zoom;
+    const worldY = (y - viewport.y) / viewport.zoom;
+
     // Set drawing style
     if (tool === 'eraser') {
       ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = 20;
+      ctx.lineWidth = 20 / viewport.zoom; // Scale line width with zoom
     } else {
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = selectedColor;
-      ctx.lineWidth = brushType === 'pencil' ? 2 : brushType === 'marker' ? 8 : 15;
+      const baseWidth = brushType === 'pencil' ? 2 : brushType === 'marker' ? 8 : 15;
+      ctx.lineWidth = baseWidth / viewport.zoom; // Scale line width with zoom
     }
     
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Start drawing
+    // Apply viewport transformation
+    ctx.save();
+    ctx.translate(viewport.x, viewport.y);
+    ctx.scale(viewport.zoom, viewport.zoom);
+
+    // Start drawing in world coordinates
     ctx.beginPath();
-    ctx.moveTo(x, y);
+    ctx.moveTo(worldX, worldY);
     
     setIsDrawing(true);
-    setLastPoint({ x, y });
+    setLastPoint({ x: worldX, y: worldY });
   };
 
   const continueDrawing = (x: number, y: number) => {
@@ -306,15 +377,28 @@ export const useDashboard = (): UseDashboardReturn => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Draw line to current position
-    ctx.lineTo(x, y);
+    // Transform screen coordinates to world coordinates
+    const worldX = (x - viewport.x) / viewport.zoom;
+    const worldY = (y - viewport.y) / viewport.zoom;
+
+    // Continue drawing in world coordinates
+    ctx.lineTo(worldX, worldY);
     ctx.stroke();
     
-    setLastPoint({ x, y });
+    setLastPoint({ x: worldX, y: worldY });
   };
 
   const finishDrawing = () => {
     if (!isDrawing) return;
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Restore transformation
+    ctx.restore();
     
     setIsDrawing(false);
     setLastPoint(null);
@@ -405,12 +489,6 @@ export const useDashboard = (): UseDashboardReturn => {
     const y = e.clientY - rect.top;
 
     console.log('Click position:', { x, y });
-
-    // Stop any smooth panning
-    if (isSmoothPanning) {
-      cancelAnimationFrame(smoothPanAnimationRef.current!);
-      setIsSmoothPanning(false);
-    }
 
     if (tool === 'hand' || e.button === 2 || (e.button === 0 && e.altKey)) {
       console.log('STARTING PANNING');
@@ -813,75 +891,20 @@ export const useDashboard = (): UseDashboardReturn => {
     }
   };
 
-  // Smooth panning
-  const startSmoothPan = (targetX: number, targetY: number) => {
-    console.log('Starting smooth pan to:', { targetX, targetY });
-    
-    if (smoothPanAnimationRef.current) {
-      cancelAnimationFrame(smoothPanAnimationRef.current);
-    }
-
-    startViewportRef.current = { ...viewport };
-    targetViewportRef.current = { ...viewport, x: targetX, y: targetY };
-    animationStartTimeRef.current = Date.now();
-    setIsSmoothPanning(true);
-    
-    animateSmooth();
-  };
-
-  const animateSmooth = () => {
-    if (!startViewportRef.current || !targetViewportRef.current) return;
-
-    const elapsed = Date.now() - animationStartTimeRef.current;
-    const duration = 400; // ms
-    const progress = Math.min(elapsed / duration, 1);
-    
-    // Ease-out animation
-    const easedProgress = 1 - Math.pow(1 - progress, 3);
-    
-    const currentX = startViewportRef.current.x + (targetViewportRef.current.x - startViewportRef.current.x) * easedProgress;
-    const currentY = startViewportRef.current.y + (targetViewportRef.current.y - startViewportRef.current.y) * easedProgress;
-    
-    const newViewport = {
-      ...viewport,
-      x: currentX,
-      y: currentY
-    };
-    
-    setViewport(newViewport);
-
-    if (progress < 1) {
-      smoothPanAnimationRef.current = requestAnimationFrame(animateSmooth);
-    } else {
-      setIsSmoothPanning(false);
-      startViewportRef.current = null;
-      targetViewportRef.current = null;
-    }
-  };
-
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     console.log('=== DOUBLE CLICK ===');
     
     const canvas = canvasRef.current;
     if (!canvas || typeof window === "undefined") return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    console.log('Double-click at:', { x, y });
-
-    // Center the view at clicked point
-    const targetX = window.innerWidth / 2 - x;
-    const targetY = window.innerHeight / 2 - y;
-    
-    startSmoothPan(targetX, targetY);
-    
-    // Switch to hand tool for immediate panning
+    // Only switch to hand tool for immediate panning, don't auto-center
     if (tool !== 'hand') {
       previousToolRef.current = tool;
       setTool('hand');
     }
+    
+    // Prevent any default double-click behavior
+    e.preventDefault();
   };
 
   return {
