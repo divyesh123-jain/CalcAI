@@ -97,7 +97,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
         onClick={onClick}
         disabled={disabled}
         className={`
-          relative w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 p-0 
+          relative w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 p-0 
           rounded-lg sm:rounded-xl backdrop-blur-md
           ${isActive 
             ? 'bg-gradient-to-r from-cyan-500/30 to-purple-500/30 border-cyan-400/50 shadow-lg shadow-cyan-500/25' 
@@ -107,7 +107,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-cyan-400/30'}
         `}
       >
-        <Icon className={`w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5 ${isActive ? 'text-cyan-300' : 'text-white/80'}`} />
+        <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 ${isActive ? 'text-cyan-300' : 'text-white/80'}`} />
         {badge && (
           <span className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-red-500 text-xs rounded-full flex items-center justify-center text-white">
             {badge}
@@ -115,26 +115,27 @@ const Toolbar: React.FC<ToolbarProps> = ({
         )}
       </Button>
       
-      {/* Tooltip - Hidden on small screens */}
-      <div className="hidden md:block absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-black/80 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+      {/* Tooltip - Compact and below buttons */}
+      <div className="hidden md:block absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-black/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 backdrop-blur-md border border-white/10">
         {label}
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-b-3 border-transparent border-b-black/90"></div>
       </div>
     </div>
   );
 
   return (
     <>
-      {/* Main Toolbar - Responsive */}
-      <div className="fixed top-2 sm:top-6 left-2 right-2 sm:left-1/2 sm:right-auto sm:transform sm:-translate-x-1/2 z-50">
-        <div className="flex items-center gap-1 sm:gap-3 p-2 sm:p-4 rounded-xl sm:rounded-2xl backdrop-blur-lg bg-black/20 border border-white/10 shadow-2xl overflow-x-auto">
+      {/* Main Toolbar - More compact but still attractive */}
+      <div className="fixed top-2 sm:top-4 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="flex items-center gap-1.5 sm:gap-3 p-2 sm:p-3 rounded-xl backdrop-blur-lg bg-black/25 border border-white/15 shadow-2xl min-h-[44px] sm:min-h-[56px]">
           
-          {/* Calculate Button - Special highlighted button */}
+          {/* Calculate Button - Compact but prominent */}
           <div className="relative flex-shrink-0">
             <Button
               onClick={onCalculate}
               disabled={isLoading}
               className={`
-                px-3 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-sm sm:text-base
+                px-3 py-2 sm:px-5 sm:py-3 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-xs sm:text-sm min-h-[32px] sm:min-h-[40px]
                 ${isLoading
                   ? 'bg-gradient-to-r from-orange-500 to-red-500 animate-pulse'
                   : 'bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400'
@@ -161,7 +162,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <div className="w-px h-6 sm:h-8 bg-white/20 flex-shrink-0" />
 
           {/* Tool Selection */}
-          <div className="flex gap-1 sm:gap-2 flex-shrink-0">
+          <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
             <ToolButton
               icon={MousePointer}
               label="Draw Tool (D)"
@@ -191,7 +192,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <div className="w-px h-6 sm:h-8 bg-white/20 flex-shrink-0" />
 
           {/* Brush Types */}
-          <div className="flex gap-1 sm:gap-2 flex-shrink-0">
+          <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
             <ToolButton
               icon={PencilLine}
               label="Pencil (1)"
@@ -215,7 +216,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <div className="w-px h-6 sm:h-8 bg-white/20 flex-shrink-0" />
 
           {/* History Controls */}
-          <div className="flex gap-1 sm:gap-2 flex-shrink-0">
+          <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
             <ToolButton
               icon={Undo}
               label="Undo (Ctrl+Z)"
@@ -233,7 +234,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <div className="w-px h-6 sm:h-8 bg-white/20 flex-shrink-0" />
 
           {/* View Controls */}
-          <div className="flex gap-1 sm:gap-2 flex-shrink-0">
+          <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
             <ToolButton
               icon={ZoomIn}
               label="Zoom In (+)"
@@ -255,7 +256,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <div className="w-px h-6 sm:h-8 bg-white/20 flex-shrink-0" />
 
           {/* Additional Controls */}
-          <div className="flex gap-1 sm:gap-2 flex-shrink-0">
+          <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
             <ToolButton
               icon={Map}
               label="Toggle Minimap"

@@ -192,12 +192,13 @@ const Minimap: React.FC<MinimapProps> = ({
       ctx.lineTo(minimapSize, y);
       ctx.stroke();
     }
-  }, [scale, minimapSize]);
+  }, [scale, minimapSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsDragging(true);
     handleViewportMove(e);
     e.preventDefault();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {

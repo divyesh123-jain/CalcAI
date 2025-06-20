@@ -149,16 +149,20 @@ export const useDashboard = (): UseDashboardReturn => {
   const startViewportRef = useRef<ViewPort | null>(null);
   const animationStartTimeRef = useRef<number>(0);
 
-  const [centerPoint, setCenterPoint] = useState<Point>({ x: 0, y: 0 });
+  const [centerPoint] = useState<Point>({ 
+    x: typeof window !== "undefined" ? window.innerWidth / 2 : 400, 
+    y: typeof window !== "undefined" ? window.innerHeight / 2 : 300 
+  });
   const [showMinimap, setShowMinimap] = useState(true);
 
   // Check if we can undo/redo
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < canvasHistory.length - 1;
 
-  // Initialize canvas and event listeners
+  // Setup keyboard and resize handlers
   useEffect(() => {
-    initializeCanvas();
+    // Only run on client side
+    if (typeof window === "undefined") return;
 
     const handleKeyDownEvent = (e: KeyboardEvent) => {
       handleKeyDown(e);
@@ -172,23 +176,21 @@ export const useDashboard = (): UseDashboardReturn => {
       handleResize();
     };
 
-    window.addEventListener("keydown", handleKeyDownEvent);
-    window.addEventListener("keyup", handleKeyUpEvent);
-    window.addEventListener("resize", handleResizeEvent);
+    window.addEventListener('keydown', handleKeyDownEvent);
+    window.addEventListener('keyup', handleKeyUpEvent);
+    window.addEventListener('resize', handleResizeEvent);
 
-    setCenterPoint({
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2
-    });
+    // Initial canvas setup
+    if (canvasRef.current) {
+      initializeCanvas();
+    }
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDownEvent);
-      window.removeEventListener("keyup", handleKeyUpEvent);
-      window.removeEventListener("resize", handleResizeEvent);
-      if (smoothPanAnimationRef.current) {
-        cancelAnimationFrame(smoothPanAnimationRef.current);
-      }
+      window.removeEventListener('keydown', handleKeyDownEvent);
+      window.removeEventListener('keyup', handleKeyUpEvent);
+      window.removeEventListener('resize', handleResizeEvent);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Re-initialize canvas when canvasRef changes
@@ -214,7 +216,7 @@ export const useDashboard = (): UseDashboardReturn => {
   // CANVAS INITIALIZATION
   const initializeCanvas = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || typeof window === "undefined") return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -525,6 +527,8 @@ export const useDashboard = (): UseDashboardReturn => {
   };
 
   const centerCanvas = () => {
+    if (typeof window === "undefined") return;
+    
     setViewport(prev => ({
       ...prev,
       x: centerPoint.x - (window.innerWidth / 2) * prev.zoom,
@@ -657,7 +661,7 @@ export const useDashboard = (): UseDashboardReturn => {
 
   const handleResize = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || typeof window === "undefined") return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
@@ -670,8 +674,8 @@ export const useDashboard = (): UseDashboardReturn => {
     tempCanvas.height = canvas.height;
     tempCtx.drawImage(canvas, 0, 0);
 
-    canvas.width = typeof window !== "undefined" ? window.innerWidth : 800;
-    canvas.height = typeof window !== "undefined" ? window.innerHeight : 600;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
     setCanvasDimensions({
       width: canvas.width,
@@ -859,7 +863,7 @@ export const useDashboard = (): UseDashboardReturn => {
     console.log('=== DOUBLE CLICK ===');
     
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || typeof window === "undefined") return;
 
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;

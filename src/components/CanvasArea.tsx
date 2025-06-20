@@ -133,7 +133,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
     requestAnimationFrame(() => {
       updateCanvas(true);
     });
-  }, [viewport, drawingHistory, updateMinimap]);
+  }, [viewport, drawingHistory, updateMinimap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const drawGrid = (ctx: CanvasRenderingContext2D) => {
     const { x, y, zoom } = viewport;
