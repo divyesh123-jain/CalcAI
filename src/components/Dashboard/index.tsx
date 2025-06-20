@@ -37,7 +37,6 @@ export default function DashboardComponent() {
   });
   
   const {
-    // Actually used refs and state
     canvasRef,
     canvasDimensions,
     selectedColor,
@@ -45,33 +44,25 @@ export default function DashboardComponent() {
     isLoading,
     latexExpression,
     isEraserEnabled,
-    history,
-    currentStep,
+    canvasHistory,
+    historyIndex,
+    canUndo,
+    canRedo,
     viewport,
     tool,
     brushType,
     showMinimap,
     canvasBackgroundColor,
-
-    // Actually used setters
     setSelectedColor,
+    setViewport,
     setTool,
     setShowMinimap,
     setBrushType,
-    setViewport,
     setCanvasBackgroundColor,
-    
-    // Actually used methods
     sendData,
-    resetCanvas,
     undo,
     redo,
-    toggleEraser,
-    handleZoom,
-    centerCanvas,
-    toggleHandTool,
-    
-    // Mouse handlers for canvas
+    resetCanvas,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
@@ -79,7 +70,11 @@ export default function DashboardComponent() {
     handleWheel,
     handleContextMenu,
     handleDoubleClick,
-    getCursor,
+    handleZoom,
+    centerCanvas,
+    toggleHandTool,
+    toggleEraser,
+    getCursor
   } = useDashboard();
 
   useEffect(() => {
@@ -123,8 +118,10 @@ export default function DashboardComponent() {
   const toolbarProps = {
     isLoading,
     isEraserEnabled,
-    currentStep,
-    historyLength: history.length,
+    currentStep: historyIndex,
+    historyLength: canvasHistory.length,
+    canUndo,
+    canRedo,
     tool,
     onCalculate: () => sendData(texts, textStyle),
     onReset: handleReset,

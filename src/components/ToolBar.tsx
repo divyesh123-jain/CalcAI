@@ -29,6 +29,8 @@ interface ToolbarProps {
   isEraserEnabled: boolean;
   currentStep: number;
   historyLength: number;
+  canUndo?: boolean;
+  canRedo?: boolean;
   onCalculate: () => void;
   onReset: () => void;
   onUndo: () => void;
@@ -53,6 +55,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   isEraserEnabled,
   currentStep,
   historyLength,
+  canUndo = false,
+  canRedo = false,
   tool,
   onCalculate,
   onReset,
@@ -216,13 +220,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
               icon={Undo}
               label="Undo (Ctrl+Z)"
               onClick={onUndo}
-              disabled={currentStep <= 0}
+              disabled={!canUndo}
             />
             <ToolButton
               icon={Redo}
               label="Redo (Ctrl+Y)"
               onClick={onRedo}
-              disabled={currentStep >= historyLength - 1}
+              disabled={!canRedo}
             />
           </div>
 
