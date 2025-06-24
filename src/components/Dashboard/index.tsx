@@ -317,7 +317,7 @@ export default function DashboardComponent() {
         </div>
       )}
 
-      {/* Enhanced Text Panel with surprise features */}
+   
       <TextPanel
         textStyle={textStyle}
         onStyleChange={handleStyleChange}
