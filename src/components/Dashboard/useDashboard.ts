@@ -52,6 +52,9 @@ interface UseDashboardReturn {
   isSpacePressed: boolean;
   tool: Tool;
   brushType: BrushType;
+  brushSize: number;
+  brushOpacity: number;
+  eraserSize: number;
   centerPoint: Point;
   gridSize: number;
   showMinimap: boolean;
@@ -65,6 +68,9 @@ interface UseDashboardReturn {
   setTool: (tool: Tool) => void;
   setShowMinimap: React.Dispatch<React.SetStateAction<boolean>>;
   setBrushType: React.Dispatch<React.SetStateAction<BrushType>>;
+  setBrushSize: React.Dispatch<React.SetStateAction<number>>;
+  setBrushOpacity: React.Dispatch<React.SetStateAction<number>>;
+  setEraserSize: React.Dispatch<React.SetStateAction<number>>;
   setCanvasBackgroundColor: React.Dispatch<React.SetStateAction<string>>;
   handleKeyDown: (e: KeyboardEvent) => void;
   handleKeyUp: (e: KeyboardEvent) => void;
@@ -81,6 +87,9 @@ interface UseDashboardReturn {
   handleMouseMove: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleMouseUp: () => void;
   handleMouseOut: () => void;
+  handleTouchStart: (e: React.TouchEvent<HTMLCanvasElement>) => void;
+  handleTouchMove: (e: React.TouchEvent<HTMLCanvasElement>) => void;
+  handleTouchEnd: () => void;
   handleWheel: (e: React.WheelEvent<HTMLCanvasElement>) => void;
   handleContextMenu: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleDoubleClick: (e: React.MouseEvent<HTMLCanvasElement>) => void;
@@ -94,7 +103,7 @@ interface UseDashboardReturn {
   getCursor: () => string;
 }
 
-const MIN_ZOOM = 0.1;
+const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 5;
 const ZOOM_SENSITIVITY = 0.001;
 const PAN_SENSITIVITY = 1.2;
@@ -115,6 +124,9 @@ export const useDashboard = (): UseDashboardReturn => {
   const [selectedColor, setSelectedColor] = useState("tomato");
   const [reset, setReset] = useState(false);
   const [brushType, setBrushType] = useState<BrushType>('pencil');
+  const [brushSize, setBrushSize] = useState(5);
+  const [brushOpacity, setBrushOpacity] = useState(1);
+  const [eraserSize, setEraserSize] = useState(10);
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState("#000000");
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
 
@@ -251,10 +263,29 @@ export const useDashboard = (): UseDashboardReturn => {
   // Simple grid
   const drawGrid = (ctx: CanvasRenderingContext2D) => {
     const gridSpacing = 50;
-    const dotSize = 2;
+    const dotSize = 1.5; // Smaller, more subtle dots
     
     ctx.save();
-    ctx.fillStyle = canvasBackgroundColor === '#000000' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+    
+    // More subtle grid colors that blend better with background
+    if (canvasBackgroundColor === '#000000') {
+      ctx.fillStyle = 'rgba(255,255,255,0.05)'; // Much more subtle white dots on black
+    } else {
+      // For non-black backgrounds, use a color that's slightly different from background
+      const r = parseInt(canvasBackgroundColor.slice(1, 3), 16);
+      const g = parseInt(canvasBackgroundColor.slice(3, 5), 16);
+      const b = parseInt(canvasBackgroundColor.slice(5, 7), 16);
+      
+      // Create a subtle contrast - if background is light, use darker dots, if dark, use lighter dots
+      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+      if (brightness > 128) {
+        // Light background - use darker dots
+        ctx.fillStyle = `rgba(${Math.max(0, r - 40)}, ${Math.max(0, g - 40)}, ${Math.max(0, b - 40)}, 0.08)`;
+      } else {
+        // Dark background - use lighter dots
+        ctx.fillStyle = `rgba(${Math.min(255, r + 40)}, ${Math.min(255, g + 40)}, ${Math.min(255, b + 40)}, 0.08)`;
+      }
+    }
     
     // Simple static grid
     for (let x = gridSpacing; x < ctx.canvas.width; x += gridSpacing) {
@@ -275,14 +306,9 @@ export const useDashboard = (): UseDashboardReturn => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Clear canvas
+    // Clear canvas with background
     ctx.fillStyle = canvasBackgroundColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Apply viewport transformation
-    ctx.save();
-    ctx.translate(viewport.x, viewport.y);
-    ctx.scale(viewport.zoom, viewport.zoom);
 
     // Draw transformed grid
     drawTransformedGrid(ctx);
@@ -293,6 +319,9 @@ export const useDashboard = (): UseDashboardReturn => {
       if (imageData) {
         const img = new Image();
         img.onload = () => {
+          ctx.save();
+          ctx.translate(viewport.x, viewport.y);
+          ctx.scale(viewport.zoom, viewport.zoom);
           ctx.drawImage(img, 0, 0);
           ctx.restore();
         };
@@ -300,23 +329,55 @@ export const useDashboard = (): UseDashboardReturn => {
         return;
       }
     }
-
-    ctx.restore();
   };
 
   // Draw grid with viewport transformation
   const drawTransformedGrid = (ctx: CanvasRenderingContext2D) => {
+    // Skip grid at very low zoom levels to avoid performance issues
+    if (viewport.zoom < 0.2) return;
+    
     const gridSpacing = 50;
-    const dotSize = 2 / viewport.zoom; // Scale dot size with zoom
+    const dotSize = Math.max(0.5, 1.5 / viewport.zoom); // Smaller, more subtle dots
     
     ctx.save();
-    ctx.fillStyle = canvasBackgroundColor === '#000000' ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+    ctx.translate(viewport.x, viewport.y);
+    ctx.scale(viewport.zoom, viewport.zoom);
+    
+    // More subtle grid colors that blend better with background
+    if (canvasBackgroundColor === '#000000') {
+      ctx.fillStyle = 'rgba(255,255,255,0.05)'; // Much more subtle white dots on black
+    } else {
+      // For non-black backgrounds, use a color that's slightly different from background
+      const r = parseInt(canvasBackgroundColor.slice(1, 3), 16);
+      const g = parseInt(canvasBackgroundColor.slice(3, 5), 16);
+      const b = parseInt(canvasBackgroundColor.slice(5, 7), 16);
+      
+      // Create a subtle contrast - if background is light, use darker dots, if dark, use lighter dots
+      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+      if (brightness > 128) {
+        // Light background - use darker dots
+        ctx.fillStyle = `rgba(${Math.max(0, r - 40)}, ${Math.max(0, g - 40)}, ${Math.max(0, b - 40)}, 0.08)`;
+      } else {
+        // Dark background - use lighter dots
+        ctx.fillStyle = `rgba(${Math.min(255, r + 40)}, ${Math.min(255, g + 40)}, ${Math.min(255, b + 40)}, 0.08)`;
+      }
+    }
     
     // Calculate visible area in world coordinates
     const startX = Math.floor(-viewport.x / viewport.zoom / gridSpacing) * gridSpacing;
     const startY = Math.floor(-viewport.y / viewport.zoom / gridSpacing) * gridSpacing;
     const endX = startX + (window.innerWidth / viewport.zoom) + gridSpacing * 2;
     const endY = startY + (window.innerHeight / viewport.zoom) + gridSpacing * 2;
+    
+    // Limit grid rendering to reasonable bounds
+    const maxGridPoints = 10000;
+    const gridPointsX = Math.ceil((endX - startX) / gridSpacing);
+    const gridPointsY = Math.ceil((endY - startY) / gridSpacing);
+    
+    if (gridPointsX * gridPointsY > maxGridPoints) {
+      ctx.restore();
+      return;
+    }
     
     // Draw grid dots only in visible area
     for (let x = startX; x <= endX; x += gridSpacing) {
@@ -345,13 +406,16 @@ export const useDashboard = (): UseDashboardReturn => {
 
     // Set drawing style
     if (tool === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.lineWidth = 20 / viewport.zoom; // Scale line width with zoom
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = canvasBackgroundColor; // Use background color for eraser
+      ctx.lineWidth = eraserSize / viewport.zoom;
+      ctx.globalAlpha = 1; // Full opacity for eraser
     } else {
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = selectedColor;
-      const baseWidth = brushType === 'pencil' ? 2 : brushType === 'marker' ? 8 : 15;
-      ctx.lineWidth = baseWidth / viewport.zoom; // Scale line width with zoom
+      const baseWidth = brushSize;
+      ctx.lineWidth = baseWidth / viewport.zoom;
+      ctx.globalAlpha = brushOpacity;
     }
     
     ctx.lineCap = 'round';
@@ -399,6 +463,7 @@ export const useDashboard = (): UseDashboardReturn => {
 
     // Restore transformation
     ctx.restore();
+    ctx.globalAlpha = 1; // Reset global alpha
     
     setIsDrawing(false);
     setLastPoint(null);
@@ -548,6 +613,81 @@ export const useDashboard = (): UseDashboardReturn => {
     handleMouseUp();
   };
 
+  // TOUCH HANDLING
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault(); // Prevent default touch behaviors like scrolling
+    
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    console.log('=== TOUCH START ===');
+    console.log('Tool:', tool, 'Touch position:', { x, y });
+
+    if (tool === 'hand') {
+      console.log('STARTING TOUCH PANNING');
+      setIsPanning(true);
+      setLastPanPoint({ x: touch.clientX, y: touch.clientY });
+    } else if (tool === 'draw' || tool === 'eraser') {
+      console.log('STARTING TOUCH DRAWING');
+      startDrawing(x, y);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault(); // Prevent default touch behaviors like scrolling
+    
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    if (isPanning && lastPanPoint) {
+      const dx = touch.clientX - lastPanPoint.x;
+      const dy = touch.clientY - lastPanPoint.y;
+      
+      // Update viewport immediately
+      const newViewport = {
+        ...viewport,
+        x: viewport.x + dx,
+        y: viewport.y + dy
+      };
+      
+      setViewport(newViewport);
+      setLastPanPoint({ x: touch.clientX, y: touch.clientY });
+      
+    } else if (isDrawing && lastPoint) {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+      
+      continueDrawing(x, y);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    console.log('=== TOUCH END ===');
+    console.log('Was panning:', isPanning, 'Was drawing:', isDrawing);
+    
+    if (isPanning) {
+      console.log('STOPPING TOUCH PANNING');
+      setIsPanning(false);
+      setLastPanPoint(null);
+    }
+
+    if (isDrawing) {
+      console.log('STOPPING TOUCH DRAWING');
+      finishDrawing();
+    }
+  };
+
   const handleContextMenu = (e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
   };
@@ -567,11 +707,16 @@ export const useDashboard = (): UseDashboardReturn => {
   };
 
   const handleZoom = (zoomIn: boolean) => {
+    if (typeof window === "undefined") return;
+    
     const currentZoom = viewport.zoom;
     const zoomStep = zoomIn ? 0.2 : -0.2;
     const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, currentZoom + zoomStep));
 
-    setViewport(prev => ({ ...prev, zoom: newZoom }));
+    // Zoom to center of screen
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+    zoomToPoint(newZoom, centerX, centerY);
   };
 
   const zoomToPoint = (newZoom: number, x: number, y: number) => {
@@ -650,7 +795,7 @@ export const useDashboard = (): UseDashboardReturn => {
 
     switch (tool) {
       case 'eraser':
-        return "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"white\" stroke=\"white\" stroke-width=\"2\"><path d=\"M19 19H5L17 7l2 2z\"/></svg>') 0 24, auto";
+        return "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"white\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m7 21-4.3-4.3c-.9-.9-.9-2.3 0-3.2l9.6-9.6c.9-.9 2.3-.9 3.2 0l5.6 5.6c.9.9.9 2.3 0 3.2L13 21\"/><path d=\"M22 21H7\"/><path d=\"m5 11 9 9\"/></svg>') 12 12, auto";
       default:
         return 'crosshair';
     }
@@ -790,6 +935,9 @@ export const useDashboard = (): UseDashboardReturn => {
     setLatexExpression([]);
     setVariable({});
     setBrushType('pencil');
+    setBrushSize(5);
+    setBrushOpacity(1);
+    setEraserSize(10);
     
     // Clear canvas immediately
     const canvas = canvasRef.current;
@@ -954,6 +1102,9 @@ export const useDashboard = (): UseDashboardReturn => {
     isSpacePressed,
     tool,
     brushType,
+    brushSize,
+    brushOpacity,
+    eraserSize,
     centerPoint,
     gridSize: 20,
     showMinimap,
@@ -967,6 +1118,9 @@ export const useDashboard = (): UseDashboardReturn => {
     setTool,
     setShowMinimap,
     setBrushType,
+    setBrushSize,
+    setBrushOpacity,
+    setEraserSize,
     setCanvasBackgroundColor,
     handleKeyDown,
     handleKeyUp,
@@ -983,6 +1137,9 @@ export const useDashboard = (): UseDashboardReturn => {
     handleMouseMove,
     handleMouseUp,
     handleMouseOut,
+    handleTouchStart,
+    handleTouchMove,
+    handleTouchEnd,
     handleWheel,
     handleContextMenu,
     handleDoubleClick,

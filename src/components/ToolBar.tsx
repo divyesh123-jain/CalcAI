@@ -1,17 +1,17 @@
 // components/Toolbar.tsx
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "./ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
 import { BrushType, Tool } from "../lib/types";
 import { 
-  Calculator, 
   Eraser, 
   Undo, 
   Redo, 
   RotateCcw, 
   ZoomIn, 
   ZoomOut, 
-  MousePointer, 
   Hand, 
   Home, 
   Map, 
@@ -19,16 +19,14 @@ import {
   Highlighter, 
   Brush,
   Settings,
-  Palette,
-  Activity
+  Activity,
+  Check,
 } from "lucide-react";
 import { FaFont } from "react-icons/fa";
 
 interface ToolbarProps {
   isLoading: boolean;
   isEraserEnabled: boolean;
-  currentStep: number;
-  historyLength: number;
   canUndo?: boolean;
   canRedo?: boolean;
   onCalculate: () => void;
@@ -43,18 +41,22 @@ interface ToolbarProps {
   toggleHandTool: () => void;
   onSetBrushType: (brushType: BrushType) => void;
   currentBrushType: BrushType;
-  onSetTool: React.Dispatch<React.SetStateAction<Tool>>;
+  onSetTool: (tool: Tool) => void;
   tool: Tool;
-  showColorPicker?: boolean;
-  onToggleColorPicker?: () => void;
   onToggleCanvasSettings?: () => void;
+  brushSize: number;
+  onBrushSizeChange: (size: number) => void;
+  brushOpacity: number;
+  onBrushOpacityChange: (opacity: number) => void;
+  eraserSize: number;
+  onEraserSizeChange: (size: number) => void;
+  selectedColor: string;
+  onColorChange: (color: string) => void;
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
   isLoading,
   isEraserEnabled,
-  currentStep,
-  historyLength,
   canUndo = false,
   canRedo = false,
   tool,
@@ -71,243 +73,256 @@ const Toolbar: React.FC<ToolbarProps> = ({
   toggleHandTool,
   onSetBrushType,
   currentBrushType,
-  showColorPicker = false,
-  onToggleColorPicker,
   onToggleCanvasSettings,
+  brushSize,
+  onBrushSizeChange,
+  brushOpacity,
+  onBrushOpacityChange,
+  eraserSize,
+  onEraserSizeChange,
+  selectedColor,
+  onColorChange,
 }) => {
+  const [activePopover, setActivePopover] = useState<string | null>(null);
+
   const ToolButton = ({ 
     icon: Icon, 
     label, 
     onClick, 
     isActive = false, 
     disabled = false,
-    className = "",
-    badge = null
+    children
   }: {
     icon: React.ComponentType<{ className?: string }>;
     label: string;
-    onClick: () => void;
+    onClick?: () => void;
     isActive?: boolean;
     disabled?: boolean;
-    className?: string;
-    badge?: string | null;
-  }) => (
-    <div className={`relative group ${className}`}>
+    children?: React.ReactNode;
+  }) => {
+    if (children) {
+      return (
+        <Popover open={activePopover === label} onOpenChange={(isOpen) => setActivePopover(isOpen ? label : null)}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={disabled}
+              className={`h-10 w-10 rounded-lg ${isActive ? 'bg-blue-500/20 text-blue-300' : 'text-white/80 hover:bg-white/10'}`}
+              onClick={() => {
+                onClick?.();
+                setActivePopover(activePopover === label ? null : label);
+              }}
+            >
+              <Icon className="w-5 h-5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent side="bottom" className="w-64 bg-black/80 backdrop-blur-md border-gray-700 text-white p-4">
+            {children}
+          </PopoverContent>
+        </Popover>
+      );
+    }
+
+    return (
       <Button
+        variant="ghost"
+        size="icon"
         onClick={onClick}
         disabled={disabled}
-        className={`
-          relative w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 p-0 
-          rounded-lg sm:rounded-xl backdrop-blur-md
-          ${isActive 
-            ? 'bg-gradient-to-r from-cyan-500/30 to-purple-500/30 border-cyan-400/50 shadow-lg shadow-cyan-500/25' 
-            : 'bg-white/5 hover:bg-white/10 border-white/10'
-          }
-          border transition-all duration-300 hover:scale-105 hover:shadow-lg
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-cyan-400/30'}
-        `}
+        className={`h-10 w-10 rounded-lg ${isActive ? 'bg-blue-500/20 text-blue-300' : 'text-white/80 hover:bg-white/10'}`}
+        title={label}
       >
-        <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 ${isActive ? 'text-cyan-300' : 'text-white/80'}`} />
-        {badge && (
-          <span className="absolute -top-1 -right-1 w-3 h-3 sm:w-4 sm:h-4 bg-red-500 text-xs rounded-full flex items-center justify-center text-white">
-            {badge}
-          </span>
-        )}
+        <Icon className="w-5 h-5" />
       </Button>
-      
-      {/* Tooltip - Compact and below buttons */}
-      <div className="hidden md:block absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-2 py-1 bg-black/90 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50 backdrop-blur-md border border-white/10">
-        {label}
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-3 border-r-3 border-b-3 border-transparent border-b-black/90"></div>
+    );
+  };
+
+  const BrushIcon = currentBrushType === 'pencil' ? PencilLine : currentBrushType === 'marker' ? Brush : Highlighter;
+
+  const PRESET_COLORS = [
+    '#ffffff', '#000000', '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24',
+    '#6c5ce7', '#fd79a8', '#636e72', '#a0a0a0', '#00d2d3', '#ff9f43',
+  ];
+
+  const BrushPreview = () => (
+    <div className="w-full h-12 bg-gray-800/50 rounded-lg mt-2 flex items-center justify-center">
+      <div 
+        style={{
+          width: `${brushSize}px`,
+          height: `${brushSize}px`,
+          backgroundColor: selectedColor,
+          borderRadius: '50%',
+          opacity: brushOpacity,
+        }}
+      />
+    </div>
+  );
+
+  const EraserPreview = () => (
+    <div className="w-full h-12 bg-gray-800/50 rounded-lg mt-2 flex items-center justify-center">
+      <div 
+        style={{
+          width: `${eraserSize}px`,
+          height: `${eraserSize}px`,
+          backgroundColor: '#ffffff',
+          borderRadius: '50%',
+          border: '2px solid #666',
+        }}
+      />
+    </div>
+  );
+
+  const BrushOptions = () => (
+    <div className="space-y-4">
+      <div>
+        <label className="text-xs text-white/70">Type</label>
+        <div className="grid grid-cols-3 gap-2 mt-2">
+          
+          <Button size="sm" variant={currentBrushType === 'pencil' ? 'secondary' : 'ghost'} onClick={() => onSetBrushType('pencil')} className="flex flex-col h-16">
+            <PencilLine className="w-5 h-5 mb-1" />
+            <span className="text-xs">Pencil</span>
+          </Button>
+
+          <Button size="sm" variant={currentBrushType === 'marker' ? 'secondary' : 'ghost'} onClick={() => onSetBrushType('marker')} className="flex flex-col h-16">
+            <Brush className="w-5 h-5 mb-1" />
+            <span className="text-xs">Marker</span>
+          </Button>
+
+           <Button size="sm" variant={currentBrushType === 'highlighter' ? 'secondary' : 'ghost'} onClick={() => onSetBrushType('highlighter')} className="flex flex-col h-16">
+            <Highlighter className="w-5 h-5 mb-1" />
+            <span className="text-xs">Highlighter</span>
+          </Button>
+
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-white/70">Size: {brushSize}px</label>
+        <Slider value={[brushSize]} onValueChange={([v]) => onBrushSizeChange(v)} min={1} max={50} step={1} className="mt-2" />
+      </div>
+      <div>
+        <label className="text-xs text-white/70">Opacity: {Math.round(brushOpacity * 100)}%</label>
+        <Slider value={[brushOpacity * 100]} onValueChange={([v]) => onBrushOpacityChange(v / 100)} min={1} max={100} step={1} className="mt-2" />
+      </div>
+      <BrushPreview />
+    </div>
+  );
+
+  const EraserOptions = () => (
+    <div className="space-y-4">
+      <div>
+        <label className="text-xs text-white/70">Size: {eraserSize}px</label>
+        <Slider value={[eraserSize]} onValueChange={([v]) => onEraserSizeChange(v)} min={5} max={100} step={1} className="mt-2" />
+      </div>
+      <EraserPreview />
+    </div>
+  );
+
+  const ColorOptions = () => (
+    <div>
+      <div className="grid grid-cols-6 gap-2">
+        {PRESET_COLORS.map(color => (
+          <Button
+            key={color}
+            onClick={() => onColorChange(color)}
+            style={{ backgroundColor: color }}
+            className={`w-9 h-9 rounded-md border-2 transition-transform hover:scale-110 ${selectedColor === color ? 'border-blue-400 scale-105' : 'border-white/20'}`}
+          >
+            {selectedColor === color && <Check className="w-5 h-5 text-black mix-blend-difference" />}
+          </Button>
+        ))}
+      </div>
+      <div className="relative mt-4">
+        <div className="w-full h-10 rounded-lg border border-white/20" style={{background: `linear-gradient(to right, ${selectedColor}, transparent)`}}/>
+        <input
+          type="color"
+          value={selectedColor}
+          onChange={(e) => onColorChange(e.target.value)}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
       </div>
     </div>
   );
 
   return (
     <>
-      {/* Main Toolbar - More compact but still attractive */}
-      <div className="fixed top-2 sm:top-4 left-1/2 transform -translate-x-1/2 z-50">
-        <div className="flex items-center gap-1.5 sm:gap-3 p-2 sm:p-3 rounded-xl backdrop-blur-lg bg-black/25 border border-white/15 shadow-2xl min-h-[44px] sm:min-h-[56px]">
+      {/* Main Toolbar */}
+      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95vw] sm:w-auto">
+        <div className="flex items-center gap-2 p-2 rounded-xl backdrop-blur-lg bg-black/40 border border-white/20 shadow-2xl overflow-x-auto no-scrollbar">
           
-          {/* Calculate Button - Compact but prominent */}
-          <div className="relative flex-shrink-0">
-            <Button
-              onClick={onCalculate}
-              disabled={isLoading}
-              className={`
-                px-3 py-2 sm:px-5 sm:py-3 rounded-lg sm:rounded-xl font-semibold transition-all duration-300 text-xs sm:text-sm min-h-[32px] sm:min-h-[40px]
-                ${isLoading
-                  ? 'bg-gradient-to-r from-orange-500 to-red-500 animate-pulse'
-                  : 'bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400'
-                }
-                text-white shadow-lg hover:scale-105 hover:shadow-xl
-              `}
-            >
-              {isLoading ? (
-                <>
-                  <Activity className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 animate-spin" />
-                  <span className="hidden sm:inline">Analyzing...</span>
-                  <span className="sm:hidden">...</span>
-                </>
-              ) : (
-                <>
-                  <Calculator className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                  <span className="hidden sm:inline">Calculate</span>
-                  <span className="sm:hidden">Calc</span>
-                </>
-              )}
-            </Button>
-          </div>
+          <ToolButton
+            icon={Hand}
+            label="Pan Tool (H)"
+            onClick={toggleHandTool}
+            isActive={tool === 'hand'}
+          />
+          
+          <ToolButton
+            icon={BrushIcon}
+            label="Brush Tool"
+            isActive={tool === 'draw' && !isEraserEnabled}
+            onClick={() => onSetTool('draw')}
+          >
+            <BrushOptions />
+          </ToolButton>
 
-          <div className="w-px h-6 sm:h-8 bg-white/20 flex-shrink-0" />
+          <ToolButton
+            icon={Eraser}
+            label="Eraser (E)"
+            onClick={onToggleEraser}
+            isActive={isEraserEnabled || tool === 'eraser'}
+          >
+            <EraserOptions />
+          </ToolButton>
 
-          {/* Tool Selection */}
-          <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
-            <ToolButton
-              icon={MousePointer}
-              label="Draw Tool (D)"
-              onClick={() => onSetTool('draw')}
-              isActive={tool === 'draw' && !isEraserEnabled}
-            />
-            <ToolButton
-              icon={Hand}
-              label="Pan Tool (H)"
-              onClick={toggleHandTool}
-              isActive={tool === 'hand'}
-            />
-            <ToolButton
-              icon={Eraser}
-              label="Eraser (E)"
-              onClick={onToggleEraser}
-              isActive={isEraserEnabled || tool === 'eraser'}
-            />
-            <ToolButton
-              icon={FaFont}
-              label="Text Tool (T)"
-              onClick={() => onSetTool('text')}
-              isActive={tool === 'text'}
-            />
-          </div>
+          <ToolButton
+            icon={FaFont}
+            label="Text Tool (T)"
+            onClick={() => onSetTool('text')}
+            isActive={tool === 'text'}
+          />
+          
+          <div className="w-px h-6 bg-white/20 mx-2" />
+          
+          <Popover>
+             <PopoverTrigger asChild>
+                <Button
+                    style={{ backgroundColor: selectedColor }}
+                    className="w-8 h-8 rounded-full border-2 border-white/50 transition-transform hover:scale-110"
+                    aria-label="Color Picker"
+                />
+             </PopoverTrigger>
+             <PopoverContent side="bottom" className="w-auto bg-black/80 backdrop-blur-md border-gray-700 text-white p-4">
+               <ColorOptions />
+             </PopoverContent>
+           </Popover>
 
-          <div className="w-px h-6 sm:h-8 bg-white/20 flex-shrink-0" />
+          <div className="w-px h-6 bg-white/20 mx-2" />
+          
+          <ToolButton icon={Undo} label="Undo" onClick={onUndo} disabled={!canUndo} />
+          <ToolButton icon={Redo} label="Redo" onClick={onRedo} disabled={!canRedo} />
+          
+          <div className="w-px h-6 bg-white/20 mx-2" />
+          
+          <Button onClick={onCalculate} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 h-10 rounded-lg">
+            {isLoading ? <Activity className="w-5 h-5 animate-spin" /> : "Calculate"}
+          </Button>
 
-          {/* Brush Types */}
-          <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
-            <ToolButton
-              icon={PencilLine}
-              label="Pencil (1)"
-              onClick={() => { onSetBrushType('pencil'); onSetTool('draw'); }}
-              isActive={currentBrushType === 'pencil' && !isEraserEnabled}
-            />
-            <ToolButton
-              icon={Brush}
-              label="Marker (2)"
-              onClick={() => { onSetBrushType('marker'); onSetTool('draw'); }}
-              isActive={currentBrushType === 'marker' && !isEraserEnabled}
-            />
-            <ToolButton
-              icon={Highlighter}
-              label="Highlighter (3)"
-              onClick={() => { onSetBrushType('highlighter'); onSetTool('draw'); }}
-              isActive={currentBrushType === 'highlighter' && !isEraserEnabled}
-            />
-          </div>
-
-          <div className="w-px h-6 sm:h-8 bg-white/20 flex-shrink-0" />
-
-          {/* History Controls */}
-          <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
-            <ToolButton
-              icon={Undo}
-              label="Undo (Ctrl+Z)"
-              onClick={onUndo}
-              disabled={!canUndo}
-            />
-            <ToolButton
-              icon={Redo}
-              label="Redo (Ctrl+Y)"
-              onClick={onRedo}
-              disabled={!canRedo}
-            />
-          </div>
-
-          <div className="w-px h-6 sm:h-8 bg-white/20 flex-shrink-0" />
-
-          {/* View Controls */}
-          <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
-            <ToolButton
-              icon={ZoomIn}
-              label="Zoom In (+)"
-              onClick={onZoomIn}
-            />
-            <ToolButton
-              icon={ZoomOut}
-              label="Zoom Out (-)"
-              onClick={onZoomOut}
-            />
-            <ToolButton
-              icon={Home}
-              label="Center Canvas"
-              onClick={onCenterCanvas}
-              className="hidden sm:block"
-            />
-          </div>
-
-          <div className="w-px h-6 sm:h-8 bg-white/20 flex-shrink-0" />
-
-          {/* Additional Controls */}
-          <div className="flex gap-1 sm:gap-1.5 flex-shrink-0">
-            <ToolButton
-              icon={Map}
-              label="Toggle Minimap"
-              onClick={onToggleMinimap}
-              className="hidden sm:block"
-            />
-            {onToggleColorPicker && (
-              <ToolButton
-                icon={Palette}
-                label="Color Picker"
-                onClick={onToggleColorPicker}
-                isActive={showColorPicker}
-              />
-            )}
-            {onToggleCanvasSettings && (
-              <ToolButton
-                icon={Settings}
-                label="Canvas Settings"
-                onClick={onToggleCanvasSettings}
-              />
-            )}
-            <ToolButton
-              icon={RotateCcw}
-              label="Reset Canvas"
-              onClick={onReset}
-              disabled={isLoading}
-            />
-          </div>
         </div>
       </div>
 
-      {/* Status Bar - Responsive positioning */}
-      <div className="fixed bottom-2 left-2 right-2 sm:bottom-6 sm:left-6 sm:right-auto flex gap-2 sm:gap-3 z-40">
-        <div className="flex-1 sm:flex-initial px-2 py-1 sm:px-3 sm:py-2 rounded-lg backdrop-blur-md bg-black/20 border border-white/10 text-white/80 text-xs sm:text-sm text-center sm:text-left">
-          <span className="sm:hidden">Tool: </span>
-          <span className="hidden sm:inline">Tool: </span>
-          <span className="text-cyan-300 capitalize">{tool}</span>
-        </div>
-        {currentBrushType && !isEraserEnabled && (
-          <div className="flex-1 sm:flex-initial px-2 py-1 sm:px-3 sm:py-2 rounded-lg backdrop-blur-md bg-black/20 border border-white/10 text-white/80 text-xs sm:text-sm text-center sm:text-left">
-            <span className="sm:hidden">Brush: </span>
-            <span className="hidden sm:inline">Brush: </span>
-            <span className="text-purple-300 capitalize">{currentBrushType}</span>
-          </div>
-        )}
-        <div className="flex-1 sm:flex-initial px-2 py-1 sm:px-3 sm:py-2 rounded-lg backdrop-blur-md bg-black/20 border border-white/10 text-white/80 text-xs sm:text-sm text-center sm:text-left">
-          <span className="sm:hidden">Step: </span>
-          <span className="hidden sm:inline">History: </span>
-          <span className="text-emerald-300">{currentStep + 1}/{historyLength}</span>
-        </div>
-      </div>
+      {/* View Controls Toolbar */}
+       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
+         <div className="flex items-center gap-2 p-2 rounded-xl backdrop-blur-lg bg-black/40 border border-white/20 shadow-2xl">
+            <ToolButton icon={ZoomOut} label="Zoom Out" onClick={onZoomOut} />
+            <ToolButton icon={Home} label="Reset Zoom" onClick={onCenterCanvas} />
+            <ToolButton icon={ZoomIn} label="Zoom In" onClick={onZoomIn} />
+            <div className="w-px h-6 bg-white/20 mx-2" />
+            <ToolButton icon={Settings} label="Settings" onClick={onToggleCanvasSettings} />
+            <ToolButton icon={Map} label="Toggle Minimap" onClick={onToggleMinimap} />
+             <ToolButton icon={RotateCcw} label="Reset Canvas" onClick={onReset} />
+         </div>
+       </div>
     </>
   );
 };

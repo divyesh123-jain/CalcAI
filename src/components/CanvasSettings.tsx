@@ -171,18 +171,17 @@ const CanvasSettings: React.FC<CanvasSettingsProps> = ({
                   <Palette className="w-4 h-4 text-cyan-400" />
                   Canvas Background
                 </h3>
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
                   {backgroundColors.map((color) => (
                     <div key={color.value} className="text-center">
                       {color.value === 'custom' ? (
-                        <div className="relative">
+                        <div className="relative inline-block">
                           <input
                             type="color"
                             value={canvasBackgroundColor}
                             onChange={(e) => onBackgroundColorChange(e.target.value)}
                             className="w-12 h-12 rounded-lg border-2 border-white/20 cursor-pointer bg-transparent"
                           />
-                          <div className="text-white/60 text-xs mt-1">Custom</div>
                         </div>
                       ) : (
                         <button

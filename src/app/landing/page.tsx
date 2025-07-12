@@ -267,7 +267,7 @@ export default function LandingPage() {
         {/* Main Content */}
         <div className="relative z-20 flex items-center justify-center min-h-screen px-6">
           <div className="max-w-7xl mx-auto">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div className="grid lg:grid-cols-2 gap-8 md:gap-16 items-center">
               
               {/* Left Side - Hero Content */}
               <div className="text-center lg:text-left slide-up">
@@ -278,7 +278,7 @@ export default function LandingPage() {
                 </div>
                 
                 {/* Main Heading */}
-                <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight fancy-font">
+                <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight fancy-font">
                   Calc
                   <span className="gradient-text">AI</span>
                 </h1>
@@ -315,7 +315,7 @@ export default function LandingPage() {
               
               {/* Right Side - Interactive Demo */}
               <div className="flex justify-center lg:justify-end slide-up">
-                <div className="relative">
+                <div className="relative w-full max-w-sm mx-auto">
                   {/* Decorative Elements */}
                   <div className="absolute -top-4 -right-4 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl"></div>
                   <div className="absolute -bottom-4 -left-4 w-72 h-72 bg-blue-600/10 rounded-full blur-3xl"></div>
@@ -331,7 +331,7 @@ export default function LandingPage() {
         </div>
         
         {/* Bottom Navigation */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-30">
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-30 hidden sm:block">
           <div className="flex items-center space-x-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full px-8 py-4">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center">
               <Calculator className="w-6 h-6 text-white" />

@@ -40,12 +40,12 @@ const ResultsDisplay: React.FC<ResultDisplayProps> = ({ result }) => {
   if (!result || !isVisible) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-4 left-4 right-4 sm:bottom-6 sm:left-auto sm:right-6 z-50">
       <div className={`
         transform transition-all duration-500 ease-out
         ${isVisible ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-4 opacity-0 scale-95'}
       `}>
-        <div className="w-96 p-6 rounded-2xl backdrop-blur-lg bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 border border-emerald-400/20 shadow-2xl">
+        <div className="w-full max-w-md mx-auto sm:w-96 p-4 sm:p-6 rounded-2xl backdrop-blur-lg bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 border border-emerald-400/20 shadow-2xl">
           
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
@@ -53,7 +53,7 @@ const ResultsDisplay: React.FC<ResultDisplayProps> = ({ result }) => {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 flex items-center justify-center">
                 <Calculator className="w-4 h-4 text-white" />
               </div>
-              <h3 className="text-white font-semibold">Calculation Result</h3>
+              <h3 className="text-white font-semibold text-base sm:text-lg">Calculation Result</h3>
             </div>
             <button
               onClick={handleClose}
@@ -70,7 +70,7 @@ const ResultsDisplay: React.FC<ResultDisplayProps> = ({ result }) => {
               <span className="text-white/70 text-sm font-medium">Expression</span>
             </div>
             <div className="relative group">
-              <div className="p-3 rounded-lg bg-white/5 border border-white/10 font-mono text-white">
+              <div className="p-3 rounded-lg bg-white/5 border border-white/10 font-mono text-white text-sm sm:text-base">
                 {result.expression}
               </div>
               <button
@@ -99,7 +99,7 @@ const ResultsDisplay: React.FC<ResultDisplayProps> = ({ result }) => {
                     <div className="w-5 h-5 rounded-full bg-blue-500/20 border border-blue-400/30 flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-blue-300 text-xs font-medium">{index + 1}</span>
                     </div>
-                    <div className="text-white/80 text-sm font-mono">{step}</div>
+                    <div className="text-white/80 text-xs sm:text-sm font-mono">{step}</div>
                   </div>
                 ))}
               </div>
@@ -114,7 +114,7 @@ const ResultsDisplay: React.FC<ResultDisplayProps> = ({ result }) => {
             </div>
             <div className="relative group">
               <div className="p-4 rounded-lg bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 border border-emerald-400/30">
-                <div className="text-2xl font-bold text-emerald-300 font-mono">
+                <div className="text-xl sm:text-2xl font-bold text-emerald-300 font-mono">
                   {result.answer}
                 </div>
               </div>

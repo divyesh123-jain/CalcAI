@@ -16,6 +16,9 @@ interface CanvasProps {
   handleWheel: (e: React.WheelEvent<HTMLCanvasElement>) => void;
   handleContextMenu: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleDoubleClick?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
+  handleTouchStart?: (e: React.TouchEvent<HTMLCanvasElement>) => void;
+  handleTouchMove?: (e: React.TouchEvent<HTMLCanvasElement>) => void;
+  handleTouchEnd?: () => void;
   getCursor: () => string;
   viewport: ViewPort;
 }
@@ -29,6 +32,9 @@ const Canvas: React.FC<CanvasProps> = ({
   handleWheel,
   handleContextMenu,
   handleDoubleClick,
+  handleTouchStart,
+  handleTouchMove,
+  handleTouchEnd,
   getCursor,
   viewport,
 }) => {
@@ -59,6 +65,9 @@ const Canvas: React.FC<CanvasProps> = ({
         onWheel={handleWheel}
         onContextMenu={handleContextMenu}
         onDoubleClick={onDoubleClickWrapper}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         tabIndex={0}  // Make canvas focusable
         autoFocus     // Auto-focus the canvas
         style={{ 
