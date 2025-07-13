@@ -108,13 +108,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
               variant="ghost"
               size="icon"
               disabled={disabled}
-              className={`h-10 w-10 rounded-lg ${isActive ? 'bg-blue-500/20 text-blue-300' : 'text-white/80 hover:bg-white/10'}`}
+              className={`h-14 w-14 sm:h-10 sm:w-10 rounded-lg ${isActive ? 'bg-blue-500/20 text-blue-300' : 'text-white/80 hover:bg-white/10'}`}
               onClick={() => {
                 onClick?.();
                 setActivePopover(activePopover === label ? null : label);
               }}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className="w-6 h-6 sm:w-5 sm:h-5" />
             </Button>
           </PopoverTrigger>
           <PopoverContent side="bottom" className="w-64 bg-black/80 backdrop-blur-md border-gray-700 text-white p-4">
@@ -130,10 +130,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
         size="icon"
         onClick={onClick}
         disabled={disabled}
-        className={`h-10 w-10 rounded-lg ${isActive ? 'bg-blue-500/20 text-blue-300' : 'text-white/80 hover:bg-white/10'}`}
+        className={`h-14 w-14 sm:h-10 sm:w-10 rounded-lg ${isActive ? 'bg-blue-500/20 text-blue-300' : 'text-white/80 hover:bg-white/10'}`}
         title={label}
       >
-        <Icon className="w-5 h-5" />
+        <Icon className="w-6 h-6 sm:w-5 sm:h-5" />
       </Button>
     );
   };
@@ -248,7 +248,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     <>
       {/* Main Toolbar */}
       <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95vw] sm:w-auto">
-        <div className="flex items-center gap-2 p-2 rounded-xl backdrop-blur-lg bg-black/40 border border-white/20 shadow-2xl overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-6 sm:gap-2 p-4 sm:p-2 rounded-xl backdrop-blur-lg bg-black/40 border border-white/20 shadow-2xl overflow-x-auto no-scrollbar">
           
           <ToolButton
             icon={Hand}
@@ -282,13 +282,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
             isActive={tool === 'text'}
           />
           
-          <div className="w-px h-6 bg-white/20 mx-2" />
+          <div className="hidden sm:block w-px h-6 bg-white/20 mx-2" />
           
           <Popover>
              <PopoverTrigger asChild>
                 <Button
                     style={{ backgroundColor: selectedColor }}
-                    className="w-8 h-8 rounded-full border-2 border-white/50 transition-transform hover:scale-110"
+                    className="w-14 h-14 sm:w-8 sm:h-8 rounded-full border-2 border-white/50 transition-transform hover:scale-110"
                     aria-label="Color Picker"
                 />
              </PopoverTrigger>
@@ -297,15 +297,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
              </PopoverContent>
            </Popover>
 
-          <div className="w-px h-6 bg-white/20 mx-2" />
+          <div className="hidden sm:block w-px h-6 bg-white/20 mx-2" />
           
           <ToolButton icon={Undo} label="Undo" onClick={onUndo} disabled={!canUndo} />
           <ToolButton icon={Redo} label="Redo" onClick={onRedo} disabled={!canRedo} />
           
-          <div className="w-px h-6 bg-white/20 mx-2" />
+          <div className="hidden sm:block w-px h-6 bg-white/20 mx-2" />
           
-          <Button onClick={onCalculate} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 h-10 rounded-lg">
-            {isLoading ? <Activity className="w-5 h-5 animate-spin" /> : "Calculate"}
+          <Button onClick={onCalculate} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 sm:px-4 h-14 sm:h-10 rounded-lg text-sm sm:text-base">
+            {isLoading ? <Activity className="w-6 h-6 sm:w-5 sm:h-5 animate-spin" /> : "Calculate"}
           </Button>
 
         </div>
@@ -313,11 +313,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* View Controls Toolbar */}
        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-         <div className="flex items-center gap-2 p-2 rounded-xl backdrop-blur-lg bg-black/40 border border-white/20 shadow-2xl">
+         <div className="flex items-center gap-6 sm:gap-2 p-4 sm:p-2 rounded-xl backdrop-blur-lg bg-black/40 border border-white/20 shadow-2xl">
             <ToolButton icon={ZoomOut} label="Zoom Out" onClick={onZoomOut} />
             <ToolButton icon={Home} label="Reset Zoom" onClick={onCenterCanvas} />
             <ToolButton icon={ZoomIn} label="Zoom In" onClick={onZoomIn} />
-            <div className="w-px h-6 bg-white/20 mx-2" />
+            <div className="hidden sm:block w-px h-6 bg-white/20 mx-2" />
             <ToolButton icon={Settings} label="Settings" onClick={onToggleCanvasSettings} />
             <ToolButton icon={Map} label="Toggle Minimap" onClick={onToggleMinimap} />
              <ToolButton icon={RotateCcw} label="Reset Canvas" onClick={onReset} />
