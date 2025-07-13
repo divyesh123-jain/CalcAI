@@ -140,7 +140,9 @@ export const TextPanel: React.FC<TextPanelProps> = ({
   if (!isVisible) return null;
 
   return (
-    <div className="text-panel fixed bottom-0 left-0 right-0 sm:left-4 sm:top-1/2 sm:-translate-y-1/2 sm:bottom-auto sm:right-auto w-full sm:w-80 bg-gray-900/95 backdrop-blur-xl border-t sm:border border-gray-700/50 rounded-t-2xl sm:rounded-2xl shadow-2xl z-50 transition-all duration-300 ease-out max-h-[50vh] sm:max-h-[90vh] overflow-y-auto">
+    <div 
+      className="text-panel fixed bottom-0 left-0 right-0 sm:left-4 sm:top-1/2 sm:-translate-y-1/2 sm:bottom-auto sm:right-auto w-full sm:w-80 bg-gray-900/95 backdrop-blur-xl border-t sm:border border-gray-700/50 rounded-t-2xl sm:rounded-2xl shadow-2xl z-50 transition-all duration-300 ease-out max-h-[50vh] sm:max-h-[90vh] overflow-y-auto no-scrollbar"
+    >
       {/* Header */}
       <div className="flex items-center gap-3 p-4 sm:p-6 border-b border-gray-700/50">
         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
@@ -183,7 +185,7 @@ export const TextPanel: React.FC<TextPanelProps> = ({
         {/* Text Styles */}
         <div className="space-y-3">
           <label className="block text-sm font-medium text-gray-300">Text Styles</label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             {TEXT_STYLES.map((style) => (
               <Button
                 key={style.name}
@@ -209,7 +211,7 @@ export const TextPanel: React.FC<TextPanelProps> = ({
             <Sparkles className="w-4 h-4 text-purple-400" />
             Magic Effects
           </label>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-2">
             {MAGIC_EFFECTS.map((effect) => (
               <Button
                 key={effect.name}
@@ -288,7 +290,7 @@ export const TextPanel: React.FC<TextPanelProps> = ({
               onClick={() => onStyleChange({ 
                 fontWeight: textStyle.fontWeight === 'bold' ? 'normal' : 'bold' 
               })}
-              className={`flex-1 transition-all duration-200 ${
+              className={`flex-1 transition-all duration-200 justify-center ${
                 textStyle.fontWeight === 'bold'
                   ? 'bg-blue-600 text-white border-blue-500'
                   : 'bg-gray-800/50 border-gray-600/50 text-gray-300 hover:bg-gray-700/50'
@@ -303,7 +305,7 @@ export const TextPanel: React.FC<TextPanelProps> = ({
               onClick={() => onStyleChange({ 
                 fontStyle: textStyle.fontStyle === 'italic' ? 'normal' : 'italic' 
               })}
-              className={`flex-1 transition-all duration-200 ${
+              className={`flex-1 transition-all duration-200 justify-center ${
                 textStyle.fontStyle === 'italic'
                   ? 'bg-blue-600 text-white border-blue-500'
                   : 'bg-gray-800/50 border-gray-600/50 text-gray-300 hover:bg-gray-700/50'

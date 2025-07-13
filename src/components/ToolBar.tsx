@@ -5,6 +5,7 @@ import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { BrushType, Tool } from "../lib/types";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   Eraser, 
   Undo, 
@@ -100,23 +101,35 @@ const Toolbar: React.FC<ToolbarProps> = ({
     disabled?: boolean;
     children?: React.ReactNode;
   }) => {
+    const buttonContent = (
+      <Button
+        variant="ghost"
+        size="icon"
+        disabled={disabled}
+        className={`h-10 w-10 rounded-lg ${
+          isActive 
+            ? 'bg-blue-500/20 text-blue-300' 
+            : 'text-white/80 hover:bg-white/20'
+        }`}
+        onClick={children ? () => setActivePopover(activePopover === label ? null : label) : onClick}
+      >
+        <Icon className="w-5 h-5" />
+      </Button>
+    );
+
+    const withTooltip = (
+      <Tooltip>
+        <TooltipTrigger asChild>{children ? <PopoverTrigger asChild>{buttonContent}</PopoverTrigger> : buttonContent}</TooltipTrigger>
+        <TooltipContent>
+          <p>{label}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+
     if (children) {
       return (
         <Popover open={activePopover === label} onOpenChange={(isOpen) => setActivePopover(isOpen ? label : null)}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              disabled={disabled}
-              className={`h-10 w-10 rounded-lg ${isActive ? 'bg-blue-500/20 text-blue-300' : 'text-white/80 hover:bg-white/10'}`}
-              onClick={() => {
-                onClick?.();
-                setActivePopover(activePopover === label ? null : label);
-              }}
-            >
-              <Icon className="w-5 h-5" />
-            </Button>
-          </PopoverTrigger>
+          {withTooltip}
           <PopoverContent side="bottom" className="w-64 bg-black/80 backdrop-blur-md border-gray-700 text-white p-4">
             {children}
           </PopoverContent>
@@ -124,18 +137,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
       );
     }
 
-    return (
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onClick}
-        disabled={disabled}
-        className={`h-10 w-10 rounded-lg ${isActive ? 'bg-blue-500/20 text-blue-300' : 'text-white/80 hover:bg-white/10'}`}
-        title={label}
-      >
-        <Icon className="w-5 h-5" />
-      </Button>
-    );
+    return withTooltip;
   };
 
   const BrushIcon = currentBrushType === 'pencil' ? PencilLine : currentBrushType === 'marker' ? Brush : Highlighter;
@@ -226,7 +228,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             key={color}
             onClick={() => onColorChange(color)}
             style={{ backgroundColor: color }}
-            className={`w-9 h-9 rounded-md border-2 transition-transform hover:scale-110 ${selectedColor === color ? 'border-blue-400 scale-105' : 'border-white/20'}`}
+            className={`w-8 h-8 rounded-md border-2 transition-transform hover:scale-110 ${selectedColor === color ? 'border-blue-400 scale-105' : 'border-white/20'}`}
           >
             {selectedColor === color && <Check className="w-5 h-5 text-black mix-blend-difference" />}
           </Button>
@@ -245,7 +247,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   );
 
   return (
-    <>
+    <TooltipProvider>
       {/* Main Toolbar */}
       <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[95vw] sm:w-auto">
         <div className="flex items-center gap-2 p-2 rounded-xl backdrop-blur-lg bg-black/40 border border-white/20 shadow-2xl overflow-x-auto no-scrollbar">
@@ -288,7 +290,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
              <PopoverTrigger asChild>
                 <Button
                     style={{ backgroundColor: selectedColor }}
-                    className="w-8 h-8 rounded-full border-2 border-white/50 transition-transform hover:scale-110"
+                    className="w-7 h-7 rounded-full border-2 border-white/50 transition-transform hover:scale-110"
                     aria-label="Color Picker"
                 />
              </PopoverTrigger>
@@ -304,9 +306,16 @@ const Toolbar: React.FC<ToolbarProps> = ({
           
           <div className="w-px h-6 bg-white/20 mx-2" />
           
-          <Button onClick={onCalculate} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 h-10 rounded-lg">
-            {isLoading ? <Activity className="w-5 h-5 animate-spin" /> : "Calculate"}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button onClick={onCalculate} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 h-10 rounded-lg">
+                {isLoading ? <Activity className="w-5 h-5 animate-spin" /> : "Calculate"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Calculate Expression</p>
+            </TooltipContent>
+          </Tooltip>
 
         </div>
       </div>
@@ -323,7 +332,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
              <ToolButton icon={RotateCcw} label="Reset Canvas" onClick={onReset} />
          </div>
        </div>
-    </>
+    </TooltipProvider>
   );
 };
 

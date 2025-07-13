@@ -247,7 +247,7 @@ const Minimap: React.FC<MinimapProps> = ({
 
   return (
     <div
-      className={`fixed bottom-5 right-5 z-40 rounded-xl bg-black/30 backdrop-blur-lg border border-white/10 shadow-2xl transition-all duration-300 ${isExpanded ? 'w-48 h-48' : 'w-32 h-32'}`}
+      className={`fixed bottom-5 left-5 z-40 rounded-xl bg-black/30 backdrop-blur-lg border border-white/10 shadow-2xl transition-all duration-300 ${isExpanded ? 'w-48 h-48' : 'w-32 h-32'}`}
       onMouseLeave={handleMouseUp}
     >
       <div className="absolute top-1 right-1 z-10 flex space-x-1">

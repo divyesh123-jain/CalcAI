@@ -204,7 +204,7 @@ export const useDashboard = (): UseDashboardReturn => {
       initializeCanvas();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasRef.current, selectedColor, canvasBackgroundColor]);
+  }, [canvasRef.current, canvasBackgroundColor]);
 
   // Redraw canvas when viewport changes
   useEffect(() => {
