@@ -179,7 +179,7 @@ const Minimap: React.FC<MinimapProps> = ({
     }
     
     setLastUpdate(now);
-  }, [viewport, canvasDimensions, isVisible, minimapSize, mainCanvasRef, lastUpdate, drawViewportIndicator, drawGridOverlay]);
+  }, [isVisible, minimapSize, mainCanvasRef, lastUpdate, drawViewportIndicator, drawGridOverlay]);
 
   useEffect(() => {
     updateMinimap();
@@ -212,7 +212,6 @@ const Minimap: React.FC<MinimapProps> = ({
       x: -canvasX,
       y: -canvasY,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewport, onViewportChange, canvasDimensions, minimapSize]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {

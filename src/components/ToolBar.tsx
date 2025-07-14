@@ -50,8 +50,6 @@ interface ToolbarProps {
   onBrushSizeChange: (size: number) => void;
   brushOpacity: number;
   onBrushOpacityChange: (opacity: number) => void;
-  eraserSize: number;
-  onEraserSizeChange: (size: number) => void;
   selectedColor: string;
   onColorChange: (color: string) => void;
 }
@@ -80,8 +78,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onBrushSizeChange,
   brushOpacity,
   onBrushOpacityChange,
-  eraserSize,
-  onEraserSizeChange,
   selectedColor,
   onColorChange,
 }) => {
@@ -89,15 +85,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
   const [localBrushSize, setLocalBrushSize] = useState(brushSize);
   const [localBrushOpacity, setLocalBrushOpacity] = useState(brushOpacity);
-  const [localEraserSize, setLocalEraserSize] = useState(eraserSize);
+
 
   const debouncedBrushSizeChange = useDebouncedCallback(onBrushSizeChange, 10);
   const debouncedBrushOpacityChange = useDebouncedCallback(onBrushOpacityChange, 10);
-  const debouncedEraserSizeChange = useDebouncedCallback(onEraserSizeChange, 10);
+
 
   useEffect(() => { setLocalBrushSize(brushSize) }, [brushSize]);
   useEffect(() => { setLocalBrushOpacity(brushOpacity) }, [brushOpacity]);
-  useEffect(() => { setLocalEraserSize(eraserSize) }, [eraserSize]);
+
 
   const handleBrushSizeChange = (value: number[]) => {
     setLocalBrushSize(value[0]);
@@ -110,10 +106,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     debouncedBrushOpacityChange(newOpacity);
   };
 
-  const handleEraserSizeChange = (value: number[]) => {
-    setLocalEraserSize(value[0]);
-    debouncedEraserSizeChange(value[0]);
-  };
+
 
   const ToolButton = ({ 
     icon: Icon, 
@@ -198,19 +191,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     </div>
   );
 
-  const EraserPreview = () => (
-    <div className="w-full h-12 bg-gray-800/50 rounded-lg mt-2 flex items-center justify-center">
-      <div 
-        style={{
-          width: `${localEraserSize}px`,
-          height: `${localEraserSize}px`,
-          backgroundColor: '#ffffff',
-          borderRadius: '50%',
-          border: '2px solid #666',
-        }}
-      />
-    </div>
-  );
+
 
   const BrushOptions = () => (
     <div className="space-y-4">
@@ -247,15 +228,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     </div>
   );
 
-  const EraserOptions = () => (
-    <div className="space-y-4">
-      <div>
-        <label className="text-xs text-white/70">Size: {localEraserSize}px</label>
-        <Slider value={[localEraserSize]} onValueChange={handleEraserSizeChange} min={5} max={100} step={1} className="mt-2" />
-      </div>
-      <EraserPreview />
-    </div>
-  );
+
 
   const ColorOptions = () => (
     <div>
