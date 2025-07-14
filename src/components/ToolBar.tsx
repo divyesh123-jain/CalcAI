@@ -1,11 +1,12 @@
 // components/Toolbar.tsx
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { BrushType, Tool } from "../lib/types";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useDebouncedCallback } from "use-debounce";
 import { 
   Eraser, 
   Undo, 
@@ -86,6 +87,34 @@ const Toolbar: React.FC<ToolbarProps> = ({
 }) => {
   const [activePopover, setActivePopover] = useState<string | null>(null);
 
+  const [localBrushSize, setLocalBrushSize] = useState(brushSize);
+  const [localBrushOpacity, setLocalBrushOpacity] = useState(brushOpacity);
+  const [localEraserSize, setLocalEraserSize] = useState(eraserSize);
+
+  const debouncedBrushSizeChange = useDebouncedCallback(onBrushSizeChange, 10);
+  const debouncedBrushOpacityChange = useDebouncedCallback(onBrushOpacityChange, 10);
+  const debouncedEraserSizeChange = useDebouncedCallback(onEraserSizeChange, 10);
+
+  useEffect(() => { setLocalBrushSize(brushSize) }, [brushSize]);
+  useEffect(() => { setLocalBrushOpacity(brushOpacity) }, [brushOpacity]);
+  useEffect(() => { setLocalEraserSize(eraserSize) }, [eraserSize]);
+
+  const handleBrushSizeChange = (value: number[]) => {
+    setLocalBrushSize(value[0]);
+    debouncedBrushSizeChange(value[0]);
+  };
+
+  const handleBrushOpacityChange = (value: number[]) => {
+    const newOpacity = value[0] / 100;
+    setLocalBrushOpacity(newOpacity);
+    debouncedBrushOpacityChange(newOpacity);
+  };
+
+  const handleEraserSizeChange = (value: number[]) => {
+    setLocalEraserSize(value[0]);
+    debouncedEraserSizeChange(value[0]);
+  };
+
   const ToolButton = ({ 
     icon: Icon, 
     label, 
@@ -111,7 +140,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
             ? 'bg-blue-500/20 text-blue-300' 
             : 'text-white/80 hover:bg-white/20'
         }`}
-        onClick={children ? () => setActivePopover(activePopover === label ? null : label) : onClick}
+        onClick={() => {
+          onClick?.();
+          if (children) {
+            setActivePopover(activePopover === label ? null : label);
+          }
+        }}
       >
         <Icon className="w-5 h-5" />
       </Button>
@@ -120,7 +154,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     const withTooltip = (
       <Tooltip>
         <TooltipTrigger asChild>{children ? <PopoverTrigger asChild>{buttonContent}</PopoverTrigger> : buttonContent}</TooltipTrigger>
-        <TooltipContent>
+        <TooltipContent side="top" sideOffset={15} className="z-[60]">
           <p>{label}</p>
         </TooltipContent>
       </Tooltip>
@@ -130,7 +164,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
       return (
         <Popover open={activePopover === label} onOpenChange={(isOpen) => setActivePopover(isOpen ? label : null)}>
           {withTooltip}
-          <PopoverContent side="bottom" className="w-64 bg-black/80 backdrop-blur-md border-gray-700 text-white p-4">
+          <PopoverContent side="bottom" className="w-64 bg-black/80 backdrop-blur-md border-gray-700 text-white p-4 z-[55]">
             {children}
           </PopoverContent>
         </Popover>
@@ -141,6 +175,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
   };
 
   const BrushIcon = currentBrushType === 'pencil' ? PencilLine : currentBrushType === 'marker' ? Brush : Highlighter;
+  
+  // Debug logging
+  console.log('🛠️ TOOLBAR RENDER - tool:', tool, 'isEraserEnabled:', isEraserEnabled, 'eraser isActive:', tool === 'eraser');
 
   const PRESET_COLORS = [
     '#ffffff', '#000000', '#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24',
@@ -151,11 +188,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
     <div className="w-full h-12 bg-gray-800/50 rounded-lg mt-2 flex items-center justify-center">
       <div 
         style={{
-          width: `${brushSize}px`,
-          height: `${brushSize}px`,
+          width: `${localBrushSize}px`,
+          height: `${localBrushSize}px`,
           backgroundColor: selectedColor,
           borderRadius: '50%',
-          opacity: brushOpacity,
+          opacity: localBrushOpacity,
         }}
       />
     </div>
@@ -165,8 +202,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
     <div className="w-full h-12 bg-gray-800/50 rounded-lg mt-2 flex items-center justify-center">
       <div 
         style={{
-          width: `${eraserSize}px`,
-          height: `${eraserSize}px`,
+          width: `${localEraserSize}px`,
+          height: `${localEraserSize}px`,
           backgroundColor: '#ffffff',
           borderRadius: '50%',
           border: '2px solid #666',
@@ -199,12 +236,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
         </div>
       </div>
       <div>
-        <label className="text-xs text-white/70">Size: {brushSize}px</label>
-        <Slider value={[brushSize]} onValueChange={([v]) => onBrushSizeChange(v)} min={1} max={50} step={1} className="mt-2" />
+        <label className="text-xs text-white/70">Size: {localBrushSize}px</label>
+        <Slider value={[localBrushSize]} onValueChange={handleBrushSizeChange} min={1} max={50} step={1} className="mt-2" />
       </div>
       <div>
-        <label className="text-xs text-white/70">Opacity: {Math.round(brushOpacity * 100)}%</label>
-        <Slider value={[brushOpacity * 100]} onValueChange={([v]) => onBrushOpacityChange(v / 100)} min={1} max={100} step={1} className="mt-2" />
+        <label className="text-xs text-white/70">Opacity: {Math.round(localBrushOpacity * 100)}%</label>
+        <Slider value={[localBrushOpacity * 100]} onValueChange={handleBrushOpacityChange} min={1} max={100} step={1} className="mt-2" />
       </div>
       <BrushPreview />
     </div>
@@ -213,8 +250,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const EraserOptions = () => (
     <div className="space-y-4">
       <div>
-        <label className="text-xs text-white/70">Size: {eraserSize}px</label>
-        <Slider value={[eraserSize]} onValueChange={([v]) => onEraserSizeChange(v)} min={5} max={100} step={1} className="mt-2" />
+        <label className="text-xs text-white/70">Size: {localEraserSize}px</label>
+        <Slider value={[localEraserSize]} onValueChange={handleEraserSizeChange} min={5} max={100} step={1} className="mt-2" />
       </div>
       <EraserPreview />
     </div>
@@ -271,11 +308,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
           <ToolButton
             icon={Eraser}
             label="Eraser (E)"
-            onClick={onToggleEraser}
-            isActive={isEraserEnabled || tool === 'eraser'}
-          >
-            <EraserOptions />
-          </ToolButton>
+            onClick={() => {
+              console.log('Eraser button clicked! Current tool:', tool);
+              onToggleEraser();
+            }}
+            isActive={tool === 'eraser'}
+          />
+          
+          {/* Temporarily removed EraserOptions popover for debugging */}
 
           <ToolButton
             icon={FaFont}
@@ -312,7 +352,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 {isLoading ? <Activity className="w-5 h-5 animate-spin" /> : "Calculate"}
               </Button>
             </TooltipTrigger>
-            <TooltipContent>
+            <TooltipContent side="top" sideOffset={15} className="z-[60]">
               <p>Calculate Expression</p>
             </TooltipContent>
           </Tooltip>

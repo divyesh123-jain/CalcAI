@@ -126,7 +126,7 @@ export const useDashboard = (): UseDashboardReturn => {
   const [brushType, setBrushType] = useState<BrushType>('pencil');
   const [brushSize, setBrushSize] = useState(5);
   const [brushOpacity, setBrushOpacity] = useState(1);
-  const [eraserSize, setEraserSize] = useState(10);
+  const [eraserSize, setEraserSize] = useState(20);
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState("#000000");
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
 
@@ -206,9 +206,22 @@ export const useDashboard = (): UseDashboardReturn => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasRef.current, canvasBackgroundColor]);
 
-  // Redraw canvas when viewport changes
+  // Only redraw grid when viewport changes, preserve drawn content
   useEffect(() => {
-    redrawCanvas();
+    const canvas = canvasRef.current;
+    if (!canvas || typeof window === "undefined") return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // Don't redraw if we're currently drawing
+    if (isDrawing) return;
+
+    // Clear and redraw background/grid only
+    ctx.fillStyle = canvasBackgroundColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    drawTransformedGrid(ctx);
+    
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewport]);
 
@@ -298,38 +311,7 @@ export const useDashboard = (): UseDashboardReturn => {
     ctx.restore();
   };
 
-  // Redraw the entire canvas with viewport transformation
-  const redrawCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || typeof window === "undefined") return;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Clear canvas with background
-    ctx.fillStyle = canvasBackgroundColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw transformed grid
-    drawTransformedGrid(ctx);
-
-    // Restore the previous drawing if any
-    if (canvasHistory.length > 0 && historyIndex >= 0) {
-      const imageData = canvasHistory[historyIndex];
-      if (imageData) {
-        const img = new Image();
-        img.onload = () => {
-          ctx.save();
-          ctx.translate(viewport.x, viewport.y);
-          ctx.scale(viewport.zoom, viewport.zoom);
-          ctx.drawImage(img, 0, 0);
-          ctx.restore();
-        };
-        img.src = imageData;
-        return;
-      }
-    }
-  };
 
   // Draw grid with viewport transformation
   const drawTransformedGrid = (ctx: CanvasRenderingContext2D) => {
@@ -406,11 +388,13 @@ export const useDashboard = (): UseDashboardReturn => {
 
     // Set drawing style
     if (tool === 'eraser') {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = canvasBackgroundColor; // Use background color for eraser
-      ctx.lineWidth = eraserSize / viewport.zoom;
+      console.log('ERASER MODE ACTIVATED - tool is eraser');
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.strokeStyle = "rgba(0,0,0,1)";
+      ctx.lineWidth = eraserSize / viewport.zoom; // Use eraserSize state
       ctx.globalAlpha = 1; // Full opacity for eraser
     } else {
+      console.log('DRAWING MODE ACTIVATED - tool is:', tool);
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = selectedColor;
       const baseWidth = brushSize;
@@ -478,7 +462,18 @@ export const useDashboard = (): UseDashboardReturn => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const imageData = canvas.toDataURL();
+    // Create a clean version without grid for history
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) return;
+
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    
+    // Copy only the drawn content (not the background/grid)
+    tempCtx.drawImage(canvas, 0, 0);
+    
+    const imageData = tempCanvas.toDataURL();
     
     // Remove any history after current index (for branching)
     const newHistory = canvasHistory.slice(0, historyIndex + 1);
@@ -533,8 +528,12 @@ export const useDashboard = (): UseDashboardReturn => {
 
     const img = new Image();
     img.onload = () => {
-      // Clear and restore exactly what was saved
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Clear canvas and redraw background/grid first
+      ctx.fillStyle = canvasBackgroundColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      drawTransformedGrid(ctx);
+      
+      // Then restore the drawn content
       ctx.drawImage(img, 0, 0);
       console.log('Canvas restored from image');
     };
@@ -544,7 +543,7 @@ export const useDashboard = (): UseDashboardReturn => {
   // MOUSE HANDLING
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     console.log('=== MOUSE DOWN ===');
-    console.log('Tool:', tool, 'Button:', e.button);
+    console.log('Tool:', tool, 'isEraserEnabled:', isEraserEnabled, 'Button:', e.button);
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -561,7 +560,7 @@ export const useDashboard = (): UseDashboardReturn => {
       setLastPanPoint({ x: e.clientX, y: e.clientY });
       e.preventDefault();
     } else if (tool === 'draw' || tool === 'eraser') {
-      console.log('STARTING DRAWING');
+      console.log('STARTING DRAWING/ERASING - Tool is:', tool);
       startDrawing(x, y);
     }
   };
@@ -760,20 +759,21 @@ export const useDashboard = (): UseDashboardReturn => {
   };
 
   const setTool = (newTool: Tool) => {
-    if (newTool !== 'eraser') {
-      setIsEraserEnabled(false);
-    }
+    console.log(`setTool called with: ${newTool}, current tool: ${tool}`);
     setToolInternal(newTool);
+    // Update isEraserEnabled based on tool
+    setIsEraserEnabled(newTool === 'eraser');
+    console.log(`Tool set to: ${newTool}, isEraserEnabled: ${newTool === 'eraser'}`);
   };
 
-  const toggleEraser = () => {
-    if (tool === 'eraser' || isEraserEnabled) {
+    const toggleEraser = () => {
+    console.log('TOGGLE ERASER CLICKED - Current tool:', tool);
+    if (tool === 'eraser') {
+      console.log('Switching to draw tool');
       setTool('draw');
-      setIsEraserEnabled(false);
     } else {
-      previousToolRef.current = tool;
+      console.log('Switching to eraser tool'); 
       setTool('eraser');
-      setIsEraserEnabled(true);
     }
   };
 
@@ -937,7 +937,7 @@ export const useDashboard = (): UseDashboardReturn => {
     setBrushType('pencil');
     setBrushSize(5);
     setBrushOpacity(1);
-    setEraserSize(10);
+    setEraserSize(20);
     
     // Clear canvas immediately
     const canvas = canvasRef.current;
