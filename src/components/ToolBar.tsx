@@ -16,7 +16,6 @@ import {
   ZoomOut, 
   Hand, 
   Home, 
-  Map, 
   PencilLine, 
   Highlighter, 
   Brush,
@@ -72,7 +71,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onZoomIn,
   onZoomOut,
   onCenterCanvas,
-  onToggleMinimap,
+  // onToggleMinimap,
   toggleHandTool,
   onSetBrushType,
   currentBrushType,
@@ -352,7 +351,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <ToolButton icon={ZoomIn} label="Zoom In" onClick={onZoomIn} />
             <div className="w-px h-6 bg-white/20 mx-2" />
             <ToolButton icon={Settings} label="Settings" onClick={onToggleCanvasSettings} />
-            <ToolButton icon={Map} label="Toggle Minimap" onClick={onToggleMinimap} />
+            {/* <ToolButton icon={Map} label="Toggle Minimap" onClick={onToggleMinimap} /> */}
              <ToolButton icon={RotateCcw} label="Reset Canvas" onClick={onReset} />
          </div>
        </div>

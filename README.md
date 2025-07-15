@@ -9,6 +9,23 @@ Transform handwritten mathematical expressions into digital solutions with advan
 ![TypeScript](https://img.shields.io/badge/TypeScript-blue?style=for-the-badge&logo=typescript)
 ![Tailwind](https://img.shields.io/badge/Tailwind-CSS-38B2AC?style=for-the-badge&logo=tailwind-css)
 
+## 📖 Table of Contents
+
+- [🚀 Features](#-features)
+- [🛠️ Tech Stack](#️-tech-stack)
+- [📦 Installation](#-installation)
+- [🔑 Environment Setup](#-environment-setup)
+- [🚀 Development](#-development)
+- [🎮 Usage](#-usage)
+- [🏗️ Project Structure](#️-project-structure)
+- [🔮 AI Integration](#-ai-integration)
+- [🎨 Design System](#-design-system)
+- [🚀 Deployment](#-deployment)
+- [🤝 Contributing](#-contributing)
+- [📋 Todo](#-todo)
+- [📄 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+
 ## 🚀 Features
 
 ### 🎨 Advanced Canvas Interface
@@ -48,6 +65,7 @@ Transform handwritten mathematical expressions into digital solutions with advan
 - **Tailwind CSS** - Utility-first styling
 - **Framer Motion** - Smooth animations
 - **Lucide React** - Modern icon system
+- **React Draggable** - Component for draggable elements
 
 ### AI & Processing
 - **Google Gemini AI** - Mathematical expression analysis

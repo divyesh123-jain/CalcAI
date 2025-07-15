@@ -4,7 +4,7 @@
 import React, { useEffect, useState } from "react";
 import Canvas from "../canvas/Canvas";
 import Toolbar from "../ToolBar";
-import Minimap from "../Minimap";
+// import Minimap from "../Minimap";
 import ResultsDisplay from "../ResultDisplay";
 import KeyboardShortcuts from "../KeyboardShortcuts";
 import ColorPicker from "../ColorPicker";
@@ -69,7 +69,6 @@ export default function DashboardComponent() {
     toggleHandTool,
     toggleEraser,
     getCursor,
-    worldCanvasRef,
   } = dashboard;
   const {
     texts,
@@ -242,7 +241,7 @@ export default function DashboardComponent() {
       </div>
       
       {/* Modern Minimap - Responsive positioning */}
-      {showMinimap && (
+      {/* {showMinimap && (
         <Minimap
           mainCanvasRef={worldCanvasRef}
           viewport={dashboard.viewport}
@@ -251,7 +250,7 @@ export default function DashboardComponent() {
           onToggleVisibility={() => setShowMinimap(!showMinimap)}
           canvasDimensions={{ width: 5000, height: 5000 }}
         />
-      )}
+      )} */}
       
       {/* Color Picker - Responsive positioning */}
       <ColorPicker
