@@ -38,7 +38,6 @@ export default function DashboardComponent() {
   
   const {
     canvasRef,
-    canvasDimensions,
     selectedColor,
     result,
     isLoading,
@@ -81,7 +80,8 @@ export default function DashboardComponent() {
     centerCanvas,
     toggleHandTool,
     toggleEraser,
-    getCursor
+    getCursor,
+    worldCanvasRef
   } = useDashboard();
 
   useEffect(() => {
@@ -289,12 +289,12 @@ export default function DashboardComponent() {
       {/* Modern Minimap - Responsive positioning */}
       {showMinimap && (
         <Minimap
-          mainCanvasRef={canvasRef}
+          mainCanvasRef={worldCanvasRef}
           viewport={viewport}
           onViewportChange={setViewport}
           isVisible={showMinimap}
           onToggleVisibility={() => setShowMinimap(!showMinimap)}
-          canvasDimensions={canvasDimensions}
+          canvasDimensions={{ width: 5000, height: 5000 }}
         />
       )}
       

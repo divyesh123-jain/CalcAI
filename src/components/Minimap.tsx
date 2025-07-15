@@ -31,6 +31,7 @@ const Minimap: React.FC<MinimapProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const panStartRef = useRef<{ x: number; y: number; viewportX: number; viewportY: number; } | null>(null);
 
   const minimapSize = isExpanded ? 192 : 128;
   const scale = minimapSize / Math.max(canvasDimensions.width, canvasDimensions.height);
@@ -189,45 +190,56 @@ const Minimap: React.FC<MinimapProps> = ({
     return () => clearInterval(interval);
   }, [updateMinimap]);
 
-  const handleViewportMove = useCallback((e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     const rect = minimapCanvasRef.current?.getBoundingClientRect();
     if (!rect) return;
 
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    setIsDragging(true);
+    panStartRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      viewportX: viewport.x,
+      viewportY: viewport.y,
+    };
+    e.preventDefault();
+  }, [viewport]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging || !panStartRef.current) return;
+    
+    const rect = minimapCanvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.top;
+
+    const dx = currentX - panStartRef.current.x;
+    const dy = currentY - panStartRef.current.y;
 
     const scaleX = minimapSize / canvasDimensions.width;
     const scaleY = minimapSize / canvasDimensions.height;
     const finalScale = Math.min(scaleX, scaleY);
-    
-    const offsetX = (minimapSize - canvasDimensions.width * finalScale) / 2;
-    const offsetY = (minimapSize - canvasDimensions.height * finalScale) / 2;
 
-    // Convert minimap coordinates to canvas coordinates with proper scaling
-    const canvasX = ((x - offsetX) / finalScale) * viewport.zoom - window.innerWidth / 2;
-    const canvasY = ((y - offsetY) / finalScale) * viewport.zoom - window.innerHeight / 2;
+    if (finalScale === 0) return;
+
+    // Convert minimap drag delta to world coordinates and then to viewport coordinates
+    const worldDx = dx / finalScale;
+    const worldDy = dy / finalScale;
+    
+    const newViewportX = panStartRef.current.viewportX + worldDx * viewport.zoom;
+    const newViewportY = panStartRef.current.viewportY + worldDy * viewport.zoom;
 
     onViewportChange({
       ...viewport,
-      x: -canvasX,
-      y: -canvasY,
+      x: newViewportX,
+      y: newViewportY,
     });
-  }, [viewport, onViewportChange, canvasDimensions, minimapSize]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    setIsDragging(true);
-    handleViewportMove(e);
     e.preventDefault();
-  }, [handleViewportMove]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging) return;
-    handleViewportMove(e);
-    e.preventDefault();
-  }, [isDragging, handleViewportMove]);
+  }, [isDragging, viewport, onViewportChange, canvasDimensions, minimapSize]);
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
+    panStartRef.current = null;
   }, []);
 
   if (!isVisible) {

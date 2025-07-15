@@ -27,6 +27,7 @@ interface CanvasDimensions {
 
 interface UseDashboardReturn {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  worldCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   minimapRef: React.RefObject<HTMLCanvasElement | null>;
   canvasDimensions: CanvasDimensions;
   isDrawing: boolean;
@@ -112,6 +113,7 @@ const DEFAULT_VIEWPORT: ViewPort = { x: 0, y: 0, zoom: 1 };
 export const useDashboard = (): UseDashboardReturn => {
   // Refs
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const worldCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const minimapRef = useRef<HTMLCanvasElement | null>(null);
   const previousToolRef = useRef<Tool>('draw');
 
@@ -204,26 +206,36 @@ export const useDashboard = (): UseDashboardReturn => {
       initializeCanvas();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canvasRef.current, canvasBackgroundColor]);
+  }, [canvasRef.current]);
 
-  // Only redraw grid when viewport changes, preserve drawn content
-  useEffect(() => {
+  const redrawView = () => {
+    if (typeof window === 'undefined') return;
     const canvas = canvasRef.current;
-    if (!canvas || typeof window === "undefined") return;
+    const worldCanvas = worldCanvasRef.current;
+    if (!canvas || !worldCanvas) return;
 
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Don't redraw if we're currently drawing
-    if (isDrawing) return;
-
-    // Clear and redraw background/grid only
+    ctx.save();
     ctx.fillStyle = canvasBackgroundColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    drawTransformedGrid(ctx);
     
+    ctx.translate(viewport.x, viewport.y);
+    ctx.scale(viewport.zoom, viewport.zoom);
+    
+    drawTransformedGrid(ctx);
+    ctx.drawImage(worldCanvas, 0, 0);
+
+    ctx.restore();
+  };
+
+  // Redraw grid and canvas content when viewport or background changes
+  useEffect(() => {
+    redrawView();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewport]);
+  }, [viewport, canvasBackgroundColor]);
+
 
   // Handle canvas reset
   useEffect(() => {
@@ -253,6 +265,23 @@ export const useDashboard = (): UseDashboardReturn => {
       width: canvas.width,
       height: canvas.height
     });
+
+    // Create world canvas
+    if (!worldCanvasRef.current) {
+      worldCanvasRef.current = document.createElement('canvas');
+    }
+    const worldCanvas = worldCanvasRef.current;
+    // Define a fixed large size for the world canvas
+    worldCanvas.width = 5000;
+    worldCanvas.height = 5000;
+
+    const worldCtx = worldCanvas.getContext('2d');
+    if (worldCtx) {
+      worldCtx.lineCap = "round";
+      worldCtx.lineJoin = "round";
+      worldCtx.imageSmoothingEnabled = true;
+      worldCtx.imageSmoothingQuality = "high";
+    }
 
     // Set drawing properties
     ctx.lineCap = "round";
@@ -372,82 +401,126 @@ export const useDashboard = (): UseDashboardReturn => {
     ctx.restore();
   };
 
-  // PURE CANVAS DRAWING WITH VIEWPORT SUPPORT
-  const startDrawing = (x: number, y: number) => {
+  // Redraw grid when viewport changes without clearing canvas content
+  useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || typeof window === "undefined") return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    console.log('Start drawing at:', { x, y });
+    // Don't redraw if we're currently drawing
+    if (isDrawing) return;
 
-    // Transform screen coordinates to world coordinates
+    // Use a throttled approach to avoid excessive redraws during panning
+    const timeoutId = setTimeout(() => {
+      // Store the current canvas content
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      if (tempCtx) {
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = canvas.height;
+        tempCtx.drawImage(canvas, 0, 0);
+      }
+
+      // Clear and redraw background/grid
+      ctx.fillStyle = canvasBackgroundColor;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      drawTransformedGrid(ctx);
+      
+      // Restore the canvas content immediately
+      if (tempCtx) {
+        ctx.drawImage(tempCanvas, 0, 0);
+      }
+    }, 16); // Throttle to ~60fps
+
+    return () => clearTimeout(timeoutId);
+    
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport]);
+
+  // PURE CANVAS DRAWING WITH VIEWPORT SUPPORT
+  const startDrawing = (x: number, y: number) => {
+    const worldCanvas = worldCanvasRef.current;
+    const viewCanvas = canvasRef.current;
+    if (!worldCanvas || !viewCanvas) return;
+
+    const worldCtx = worldCanvas.getContext("2d");
+    const viewCtx = viewCanvas.getContext("2d");
+    if (!worldCtx || !viewCtx) return;
+
     const worldX = (x - viewport.x) / viewport.zoom;
     const worldY = (y - viewport.y) / viewport.zoom;
 
-    // Set drawing style
-    if (tool === 'eraser') {
-      console.log('ERASER MODE ACTIVATED - tool is eraser');
-      ctx.globalCompositeOperation = 'destination-out';
-      ctx.strokeStyle = "rgba(0,0,0,1)";
-      ctx.lineWidth = eraserSize / viewport.zoom; // Use eraserSize state
-      ctx.globalAlpha = 1; // Full opacity for eraser
-    } else {
-      console.log('DRAWING MODE ACTIVATED - tool is:', tool);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.strokeStyle = selectedColor;
-      const baseWidth = brushSize;
-      ctx.lineWidth = baseWidth / viewport.zoom;
-      ctx.globalAlpha = brushOpacity;
-    }
-    
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    const isEraser = tool === 'eraser';
+    const currentBrushSize = isEraser ? eraserSize : brushSize;
+    const color = isEraser ? "rgba(0,0,0,1)" : selectedColor;
+    const compositeOp = isEraser ? 'destination-out' : 'source-over';
+    const alpha = isEraser ? 1 : brushOpacity;
 
-    // Apply viewport transformation
-    ctx.save();
-    ctx.translate(viewport.x, viewport.y);
-    ctx.scale(viewport.zoom, viewport.zoom);
+    // --- World Ctx Setup (draws to the persistent, untransformed canvas) ---
+    worldCtx.globalCompositeOperation = compositeOp;
+    worldCtx.strokeStyle = color;
+    worldCtx.lineWidth = currentBrushSize;
+    worldCtx.globalAlpha = alpha;
+    worldCtx.lineCap = 'round';
+    worldCtx.lineJoin = 'round';
+    worldCtx.beginPath();
+    worldCtx.moveTo(worldX, worldY);
 
-    // Start drawing in world coordinates
-    ctx.beginPath();
-    ctx.moveTo(worldX, worldY);
+    // --- View Ctx Setup (draws a temporary, live preview on the visible canvas) ---
+    viewCtx.save();
+    viewCtx.translate(viewport.x, viewport.y);
+    viewCtx.scale(viewport.zoom, viewport.zoom);
     
+    viewCtx.globalCompositeOperation = compositeOp;
+    viewCtx.strokeStyle = color;
+    viewCtx.lineWidth = currentBrushSize / viewport.zoom; // Adjust for zoom
+    viewCtx.globalAlpha = alpha;
+    viewCtx.lineCap = 'round';
+    viewCtx.lineJoin = 'round';
+    viewCtx.beginPath();
+    viewCtx.moveTo(worldX, worldY);
+
     setIsDrawing(true);
     setLastPoint({ x: worldX, y: worldY });
   };
 
   const continueDrawing = (x: number, y: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !lastPoint || !isDrawing) return;
+    const worldCanvas = worldCanvasRef.current;
+    const viewCanvas = canvasRef.current;
+    if (!worldCanvas || !viewCanvas || !lastPoint || !isDrawing) return;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const worldCtx = worldCanvas.getContext("2d");
+    const viewCtx = viewCanvas.getContext("2d");
+    if (!worldCtx || !viewCtx) return;
 
-    // Transform screen coordinates to world coordinates
     const worldX = (x - viewport.x) / viewport.zoom;
     const worldY = (y - viewport.y) / viewport.zoom;
 
-    // Continue drawing in world coordinates
-    ctx.lineTo(worldX, worldY);
-    ctx.stroke();
+    // Draw on world canvas for persistence
+    worldCtx.lineTo(worldX, worldY);
+    worldCtx.stroke();
     
+    // Draw on view canvas for immediate feedback
+    viewCtx.lineTo(worldX, worldY);
+    viewCtx.stroke();
+
     setLastPoint({ x: worldX, y: worldY });
   };
 
   const finishDrawing = () => {
     if (!isDrawing) return;
     
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    // Restore transformation
-    ctx.restore();
-    ctx.globalAlpha = 1; // Reset global alpha
+    // Clean up the temporary live drawing from the view canvas
+    const viewCanvas = canvasRef.current;
+    if (viewCanvas) {
+      const viewCtx = viewCanvas.getContext('2d');
+      viewCtx?.restore();
+    }
+    
+    // Redraw the view with the final, complete stroke from the world canvas
+    redrawView();
     
     setIsDrawing(false);
     setLastPoint(null);
@@ -459,21 +532,10 @@ export const useDashboard = (): UseDashboardReturn => {
 
   // UNDO/REDO WITH CANVAS SNAPSHOTS
   const saveCanvasState = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    // Create a clean version without grid for history
-    const tempCanvas = document.createElement('canvas');
-    const tempCtx = tempCanvas.getContext('2d');
-    if (!tempCtx) return;
-
-    tempCanvas.width = canvas.width;
-    tempCanvas.height = canvas.height;
+    const worldCanvas = worldCanvasRef.current;
+    if (!worldCanvas) return;
     
-    // Copy only the drawn content (not the background/grid)
-    tempCtx.drawImage(canvas, 0, 0);
-    
-    const imageData = tempCanvas.toDataURL();
+    const imageData = worldCanvas.toDataURL();
     
     // Remove any history after current index (for branching)
     const newHistory = canvasHistory.slice(0, historyIndex + 1);
@@ -520,21 +582,17 @@ export const useDashboard = (): UseDashboardReturn => {
   };
 
   const restoreCanvasFromImage = (imageData: string) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const worldCanvas = worldCanvasRef.current;
+    if (!worldCanvas) return;
 
-    const ctx = canvas.getContext("2d");
+    const ctx = worldCanvas.getContext("2d");
     if (!ctx) return;
 
     const img = new Image();
     img.onload = () => {
-      // Clear canvas and redraw background/grid first
-      ctx.fillStyle = canvasBackgroundColor;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      drawTransformedGrid(ctx);
-      
-      // Then restore the drawn content
+      ctx.clearRect(0, 0, worldCanvas.width, worldCanvas.height);
       ctx.drawImage(img, 0, 0);
+      redrawView();
       console.log('Canvas restored from image');
     };
     img.src = imageData;
@@ -953,6 +1011,12 @@ export const useDashboard = (): UseDashboardReturn => {
           height: canvas.height
         });
 
+        const worldCanvas = worldCanvasRef.current;
+        if (worldCanvas) {
+          const worldCtx = worldCanvas.getContext('2d');
+          worldCtx?.clearRect(0, 0, worldCanvas.width, worldCanvas.height);
+        }
+
         // Set drawing properties
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
@@ -980,9 +1044,7 @@ export const useDashboard = (): UseDashboardReturn => {
     // Save the clean empty state as the first history entry
     setTimeout(() => {
       if (canvas) {
-        const imageData = canvas.toDataURL();
-        setCanvasHistory([imageData]);
-        setHistoryIndex(0);
+        saveCanvasState();
         console.log('Reset complete - history reset to 1/1');
       }
     }, 10);
@@ -1077,6 +1139,7 @@ export const useDashboard = (): UseDashboardReturn => {
 
   return {
     canvasRef,
+    worldCanvasRef,
     minimapRef,
     canvasDimensions,
     isDrawing,
