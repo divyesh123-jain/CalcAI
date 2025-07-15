@@ -1,11 +1,6 @@
 "use client";
 import React, { useEffect } from "react";
-
-interface ViewPort {
-  x: number;
-  y: number;
-  zoom: number;
-}
+import { Rect, ViewPort } from "@/lib/types";
 
 interface CanvasProps {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -21,6 +16,7 @@ interface CanvasProps {
   handleTouchEnd?: () => void;
   getCursor: () => string;
   viewport: ViewPort;
+  selection: Rect | null;
 }
 
 const Canvas: React.FC<CanvasProps> = ({
@@ -37,6 +33,7 @@ const Canvas: React.FC<CanvasProps> = ({
   handleTouchEnd,
   getCursor,
   viewport,
+  selection,
 }) => {
   // Ensure canvas gets focus immediately when mounted/remounted
   useEffect(() => {
@@ -76,6 +73,17 @@ const Canvas: React.FC<CanvasProps> = ({
           outline: 'none'      // Remove focus outline
         }}
       />
+      {selection && (
+        <div
+          className="absolute border-2 border-dashed border-blue-500 pointer-events-none"
+          style={{
+            left: `${viewport.x + selection.x * viewport.zoom}px`,
+            top: `${viewport.y + selection.y * viewport.zoom}px`,
+            width: `${selection.width * viewport.zoom}px`,
+            height: `${selection.height * viewport.zoom}px`,
+          }}
+        />
+      )}
 
       {/* Zoom level indicator */}
       <div className="fixed top-6 right-6 px-3 py-2 rounded-lg backdrop-blur-md bg-black/20 border border-white/10 text-white/80 text-sm font-mono z-30">

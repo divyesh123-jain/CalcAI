@@ -1,29 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { BrushType, Tool } from "../../lib/types";
+import {
+  ViewPort,
+  Tool,
+  BrushType,
+  GeneratedResult,
+  Point,
+  CanvasDimensions,
+  Rect,
+  Stroke,
+} from "../../lib/types";
+import { getStrokeAsPath } from "@/lib/canvas-utils";
+import { getStrokesBoundingBox } from "@/lib/canvas-utils";
 
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface ViewPort {
-  x: number;
-  y: number;
-  zoom: number;
-}
-
-interface GeneratedResult {
-  expression: string;
-  answer: string;
-  steps?: string[];
-}
-
-interface CanvasDimensions {
-  width: number;
-  height: number;
-}
+type DrawingState = "idle" | "drawing" | "panning" | "erasing" | "selecting" | "resizing";
+type ResizeHandle = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 interface UseDashboardReturn {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -42,13 +34,13 @@ interface UseDashboardReturn {
   isErasing: boolean;
   draggingLatex: string | null;
   isEraserEnabled: boolean;
-  canvasHistory: string[];
   historyIndex: number;
   canUndo: boolean;
   canRedo: boolean;
   viewport: ViewPort;
   lastPanPoint: Point | null;
   isPanning: boolean;
+  isPanningSelection: boolean;
   isHandTool: boolean;
   isSpacePressed: boolean;
   tool: Tool;
@@ -61,11 +53,17 @@ interface UseDashboardReturn {
   showMinimap: boolean;
   canvasBackgroundColor: string;
   lastPoint: Point | null;
+  selection: Rect | null;
+  selectionViewport: ViewPort;
+  elements: Stroke[];
+  selectedElementIds: string[];
+  drawingState: DrawingState;
   setSelectedColor: React.Dispatch<React.SetStateAction<string>>;
   setIsEraserEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   setViewport: React.Dispatch<React.SetStateAction<ViewPort>>;
   setLastPanPoint: React.Dispatch<React.SetStateAction<Point | null>>;
   setIsPanning: React.Dispatch<React.SetStateAction<boolean>>;
+  setIsPanningSelection: React.Dispatch<React.SetStateAction<boolean>>;
   setTool: (tool: Tool) => void;
   setShowMinimap: React.Dispatch<React.SetStateAction<boolean>>;
   setBrushType: React.Dispatch<React.SetStateAction<BrushType>>;
@@ -73,6 +71,8 @@ interface UseDashboardReturn {
   setBrushOpacity: React.Dispatch<React.SetStateAction<number>>;
   setEraserSize: React.Dispatch<React.SetStateAction<number>>;
   setCanvasBackgroundColor: React.Dispatch<React.SetStateAction<string>>;
+  setSelection: React.Dispatch<React.SetStateAction<Rect | null>>;
+  setSelectionViewport: React.Dispatch<React.SetStateAction<ViewPort>>;
   handleKeyDown: (e: KeyboardEvent) => void;
   handleKeyUp: (e: KeyboardEvent) => void;
   handleResize: () => void;
@@ -81,9 +81,9 @@ interface UseDashboardReturn {
   saveCanvasState: () => void;
   undo: () => void;
   redo: () => void;
-  restoreCanvasFromImage: (imageData: string) => void;
+  restoreElements: (elements: Stroke[]) => void;
   resetCanvas: () => void;
-  sendData: (texts?: Array<{id: string, text: string, x: number, y: number, rotation: number}>, textStyle?: {fontFamily: string, fontSize: number, color: string, opacity: number, fontWeight: string, fontStyle: string}) => Promise<void>;
+  sendData: (texts?: Array<{id: string, text: string, x: number, y: number, rotation: number}>, textStyle?: {fontFamily: string, fontSize: number, color: string, opacity: number, fontWeight: string, fontStyle: string}, selection?: Rect | null) => Promise<void>;
   handleMouseDown: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleMouseMove: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleMouseUp: () => void;
@@ -102,6 +102,10 @@ interface UseDashboardReturn {
   toggleHandTool: () => void;
   toggleEraser: () => void;
   getCursor: () => string;
+  setElements: React.Dispatch<React.SetStateAction<Stroke[]>>;
+  setSelectedElementIds: React.Dispatch<React.SetStateAction<string[]>>;
+  zoomToSelection: () => void;
+  scaleSelection: (scaleFactor: number) => void;
 }
 
 const MIN_ZOOM = 0.25;
@@ -131,6 +135,10 @@ export const useDashboard = (): UseDashboardReturn => {
   const [eraserSize, setEraserSize] = useState(20);
   const [canvasBackgroundColor, setCanvasBackgroundColor] = useState("#000000");
   const [lastPoint, setLastPoint] = useState<Point | null>(null);
+  const [elements, setElements] = useState<Stroke[]>([]);
+  const [selectedElementIds, setSelectedElementIds] = useState<string[]>([]);
+  const [drawingState, setDrawingState] = useState<DrawingState>('idle');
+  const [resizeStart, setResizeStart] = useState<{ handle: ResizeHandle, originalBox: Rect, originalStrokes: Stroke[] } | null>(null);
 
   // Result state
   const [result, setResult] = useState<GeneratedResult | null>(null);
@@ -147,14 +155,17 @@ export const useDashboard = (): UseDashboardReturn => {
   const [isHandTool, setIsHandTool] = useState(false);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
 
-  // History - pure canvas snapshots
-  const [canvasHistory, setCanvasHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  // New history implementation for objects
+  const [history, setHistory] = useState<Stroke[][]>([[]]);
+  const [historyIndex, setHistoryIndex] = useState(0);
 
   // Viewport state
   const [viewport, setViewport] = useState<ViewPort>(DEFAULT_VIEWPORT);
   const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
   const [isPanning, setIsPanning] = useState(false);
+  const [isPanningSelection, setIsPanningSelection] = useState(false);
+  const [selection, setSelection] = useState<Rect | null>(null);
+  const [selectionViewport, setSelectionViewport] = useState<ViewPort>({ x: 0, y: 0, zoom: 1 });
 
   const [centerPoint] = useState<Point>({ 
     x: typeof window !== "undefined" ? window.innerWidth / 2 : 400, 
@@ -164,7 +175,7 @@ export const useDashboard = (): UseDashboardReturn => {
 
   // Check if we can undo/redo
   const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < canvasHistory.length - 1;
+  const canRedo = historyIndex < history.length - 1;
 
   // Setup keyboard and resize handlers
   useEffect(() => {
@@ -211,8 +222,7 @@ export const useDashboard = (): UseDashboardReturn => {
   const redrawView = () => {
     if (typeof window === 'undefined') return;
     const canvas = canvasRef.current;
-    const worldCanvas = worldCanvasRef.current;
-    if (!canvas || !worldCanvas) return;
+    if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -225,7 +235,37 @@ export const useDashboard = (): UseDashboardReturn => {
     ctx.scale(viewport.zoom, viewport.zoom);
     
     drawTransformedGrid(ctx);
-    ctx.drawImage(worldCanvas, 0, 0);
+    
+    // Draw all elements
+    elements.forEach(stroke => {
+      ctx.beginPath();
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.brushSize;
+      ctx.globalAlpha = stroke.opacity;
+      
+      const path = getStrokeAsPath(stroke);
+      ctx.stroke(new Path2D(path));
+    });
+
+    // Draw selection rectangle
+    if (selection) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)'; // blue-500
+      ctx.lineWidth = 1.5 / viewport.zoom;
+      ctx.setLineDash([6, 4]);
+
+      let { x, y, width, height } = selection;
+      if (width < 0) {
+        x += width;
+        width = -width;
+      }
+      if (height < 0) {
+        y += height;
+        height = -height;
+      }
+      ctx.strokeRect(x, y, width, height);
+      ctx.restore();
+    }
 
     ctx.restore();
   };
@@ -234,7 +274,7 @@ export const useDashboard = (): UseDashboardReturn => {
   useEffect(() => {
     redrawView();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewport, canvasBackgroundColor]);
+  }, [viewport, canvasBackgroundColor, elements, selection]);
 
 
   // Handle canvas reset
@@ -297,7 +337,8 @@ export const useDashboard = (): UseDashboardReturn => {
     drawGrid(ctx);
 
     // Save initial empty state
-    saveCanvasState();
+    setHistory([[]]);
+    setHistoryIndex(0);
 
     console.log('Canvas initialized:', { width: canvas.width, height: canvas.height });
   };
@@ -441,114 +482,59 @@ export const useDashboard = (): UseDashboardReturn => {
 
   // PURE CANVAS DRAWING WITH VIEWPORT SUPPORT
   const startDrawing = (x: number, y: number) => {
-    const worldCanvas = worldCanvasRef.current;
-    const viewCanvas = canvasRef.current;
-    if (!worldCanvas || !viewCanvas) return;
-
-    const worldCtx = worldCanvas.getContext("2d");
-    const viewCtx = viewCanvas.getContext("2d");
-    if (!worldCtx || !viewCtx) return;
-
-    const worldX = (x - viewport.x) / viewport.zoom;
-    const worldY = (y - viewport.y) / viewport.zoom;
-
-    const isEraser = tool === 'eraser';
-    const currentBrushSize = isEraser ? eraserSize : brushSize;
-    const color = isEraser ? "rgba(0,0,0,1)" : selectedColor;
-    const compositeOp = isEraser ? 'destination-out' : 'source-over';
-    const alpha = isEraser ? 1 : brushOpacity;
-
-    // --- World Ctx Setup (draws to the persistent, untransformed canvas) ---
-    worldCtx.globalCompositeOperation = compositeOp;
-    worldCtx.strokeStyle = color;
-    worldCtx.lineWidth = currentBrushSize;
-    worldCtx.globalAlpha = alpha;
-    worldCtx.lineCap = 'round';
-    worldCtx.lineJoin = 'round';
-    worldCtx.beginPath();
-    worldCtx.moveTo(worldX, worldY);
-
-    // --- View Ctx Setup (draws a temporary, live preview on the visible canvas) ---
-    viewCtx.save();
-    viewCtx.translate(viewport.x, viewport.y);
-    viewCtx.scale(viewport.zoom, viewport.zoom);
+    setDrawingState("drawing");
     
-    viewCtx.globalCompositeOperation = compositeOp;
-    viewCtx.strokeStyle = color;
-    viewCtx.lineWidth = currentBrushSize / viewport.zoom; // Adjust for zoom
-    viewCtx.globalAlpha = alpha;
-    viewCtx.lineCap = 'round';
-    viewCtx.lineJoin = 'round';
-    viewCtx.beginPath();
-    viewCtx.moveTo(worldX, worldY);
-
+    const newStroke: Stroke = {
+      id: `stroke_${Date.now()}`,
+      points: [{ x, y }],
+      color: selectedColor,
+      brushSize: brushSize,
+      opacity: brushOpacity,
+    };
+    
+    setElements(prev => [...prev, newStroke]);
     setIsDrawing(true);
-    setLastPoint({ x: worldX, y: worldY });
   };
 
   const continueDrawing = (x: number, y: number) => {
-    const worldCanvas = worldCanvasRef.current;
-    const viewCanvas = canvasRef.current;
-    if (!worldCanvas || !viewCanvas || !lastPoint || !isDrawing) return;
+    if (drawingState !== 'drawing' || elements.length === 0) return;
 
-    const worldCtx = worldCanvas.getContext("2d");
-    const viewCtx = viewCanvas.getContext("2d");
-    if (!worldCtx || !viewCtx) return;
-
-    const worldX = (x - viewport.x) / viewport.zoom;
-    const worldY = (y - viewport.y) / viewport.zoom;
-
-    // Draw on world canvas for persistence
-    worldCtx.lineTo(worldX, worldY);
-    worldCtx.stroke();
-    
-    // Draw on view canvas for immediate feedback
-    viewCtx.lineTo(worldX, worldY);
-    viewCtx.stroke();
-
-    setLastPoint({ x: worldX, y: worldY });
+    setElements(prevElements => {
+      const newElements = [...prevElements];
+      const lastStroke = newElements[newElements.length - 1];
+      lastStroke.points.push({ x, y });
+      return newElements;
+    });
   };
 
   const finishDrawing = () => {
-    if (!isDrawing) return;
+    if (drawingState !== 'drawing') return;
     
-    // Clean up the temporary live drawing from the view canvas
-    const viewCanvas = canvasRef.current;
-    if (viewCanvas) {
-      const viewCtx = viewCanvas.getContext('2d');
-      viewCtx?.restore();
-    }
-    
-    // Redraw the view with the final, complete stroke from the world canvas
-    redrawView();
-    
+    setDrawingState("idle");
     setIsDrawing(false);
-    setLastPoint(null);
 
     // Save canvas state after drawing
-    saveCanvasState();
+    const newHistory = [...history.slice(0, historyIndex + 1), elements];
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+    
     console.log('Drawing finished, canvas state saved');
   };
 
   // UNDO/REDO WITH CANVAS SNAPSHOTS
   const saveCanvasState = () => {
-    const worldCanvas = worldCanvasRef.current;
-    if (!worldCanvas) return;
-    
-    const imageData = worldCanvas.toDataURL();
-    
     // Remove any history after current index (for branching)
-    const newHistory = canvasHistory.slice(0, historyIndex + 1);
-    newHistory.push(imageData);
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(elements);
     
-    setCanvasHistory(newHistory);
+    setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
     
     console.log('Canvas state saved. Index:', newHistory.length - 1, 'Total:', newHistory.length);
   };
 
   const undo = () => {
-    console.log('Undo - Current index:', historyIndex, 'History length:', canvasHistory.length);
+    console.log('Undo - Current index:', historyIndex, 'History length:', history.length);
     
     if (historyIndex <= 0) {
       console.log('Cannot undo - at beginning');
@@ -556,50 +542,39 @@ export const useDashboard = (): UseDashboardReturn => {
     }
     
     const newIndex = historyIndex - 1;
-    const imageData = canvasHistory[newIndex];
+    const newElements = history[newIndex];
     
     setHistoryIndex(newIndex);
-    restoreCanvasFromImage(imageData);
+    restoreElements(newElements);
     
     console.log('Undo to index:', newIndex);
   };
 
   const redo = () => {
-    console.log('Redo - Current index:', historyIndex, 'History length:', canvasHistory.length);
+    console.log('Redo - Current index:', historyIndex, 'History length:', history.length);
     
-    if (historyIndex >= canvasHistory.length - 1) {
+    if (historyIndex >= history.length - 1) {
       console.log('Cannot redo - at end');
       return;
     }
     
     const newIndex = historyIndex + 1;
-    const imageData = canvasHistory[newIndex];
+    const newElements = history[newIndex];
     
     setHistoryIndex(newIndex);
-    restoreCanvasFromImage(imageData);
+    restoreElements(newElements);
     
     console.log('Redo to index:', newIndex);
   };
 
-  const restoreCanvasFromImage = (imageData: string) => {
-    const worldCanvas = worldCanvasRef.current;
-    if (!worldCanvas) return;
-
-    const ctx = worldCanvas.getContext("2d");
-    if (!ctx) return;
-
-    const img = new Image();
-    img.onload = () => {
-      ctx.clearRect(0, 0, worldCanvas.width, worldCanvas.height);
-      ctx.drawImage(img, 0, 0);
-      redrawView();
-      console.log('Canvas restored from image');
-    };
-    img.src = imageData;
+  const restoreElements = (elements: Stroke[]) => {
+    setElements(elements);
+    redrawView();
+    console.log('Canvas restored from elements');
   };
-
+  
   // MOUSE HANDLING
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>, handle?: ResizeHandle) => {
     console.log('=== MOUSE DOWN ===');
     console.log('Tool:', tool, 'isEraserEnabled:', isEraserEnabled, 'Button:', e.button);
     
@@ -617,13 +592,31 @@ export const useDashboard = (): UseDashboardReturn => {
       setIsPanning(true);
       setLastPanPoint({ x: e.clientX, y: e.clientY });
       e.preventDefault();
-    } else if (tool === 'draw' || tool === 'eraser') {
-      console.log('STARTING DRAWING/ERASING - Tool is:', tool);
+    } else if (tool === 'draw') {
+      console.log('STARTING DRAWING - Tool is:', tool);
       startDrawing(x, y);
+    } else if (tool === 'eraser') {
+      setDrawingState('erasing');
+    } else if (tool === 'selection') {
+      if (!selection) {
+        const worldX = (x - viewport.x) / viewport.zoom;
+        const worldY = (y - viewport.y) / viewport.zoom;
+        setSelection({ x: worldX, y: worldY, width: 0, height: 0 });
+      }
+    } else if (handle) {
+      const selectedStrokes = elements.filter(el => selectedElementIds.includes(el.id));
+      const boundingBox = getStrokesBoundingBox(selectedStrokes);
+      if (boundingBox) {
+        setDrawingState('resizing');
+        setResizeStart({ handle, originalBox: boundingBox, originalStrokes: selectedStrokes });
+      }
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const worldX = (e.clientX - viewport.x) / viewport.zoom;
+    const worldY = (e.clientY - viewport.y) / viewport.zoom;
+
     if (isPanning && lastPanPoint) {
       const dx = e.clientX - lastPanPoint.x;
       const dy = e.clientY - lastPanPoint.y;
@@ -638,15 +631,100 @@ export const useDashboard = (): UseDashboardReturn => {
       setViewport(newViewport);
       setLastPanPoint({ x: e.clientX, y: e.clientY });
       
-    } else if (isDrawing && lastPoint) {
+    } else if (drawingState === 'resizing' && resizeStart) {
+      const { handle, originalBox, originalStrokes } = resizeStart;
+      
+      let scaleX = 1, scaleY = 1, translateX = 0, translateY = 0;
+
+      if (handle.includes('right')) {
+        scaleX = (worldX - originalBox.x) / originalBox.width;
+      }
+      if (handle.includes('left')) {
+        scaleX = (originalBox.x + originalBox.width - worldX) / originalBox.width;
+        translateX = originalBox.x + originalBox.width;
+      }
+      if (handle.includes('bottom')) {
+        scaleY = (worldY - originalBox.y) / originalBox.height;
+      }
+      if (handle.includes('top')) {
+        scaleY = (originalBox.y + originalBox.height - worldY) / originalBox.height;
+        translateY = originalBox.y + originalBox.height;
+      }
+      
+      const updatedElements = elements.map(el => {
+        if (!selectedElementIds.includes(el.id)) return el;
+        
+        const originalStroke = originalStrokes.find(s => s.id === el.id);
+        if (!originalStroke) return el;
+
+        return {
+          ...el,
+          points: originalStroke.points.map(p => ({
+            x: (p.x - translateX) * scaleX + translateX,
+            y: (p.y - translateY) * scaleY + translateY,
+          })),
+        };
+      });
+      setElements(updatedElements);
+    } else if (drawingState === 'drawing') {
+      continueDrawing(worldX, worldY);
+    } else if (drawingState === 'erasing') {
+      const eraserRadius = (eraserSize / 2) / viewport.zoom;
+      const newElements: Stroke[] = [];
+      let somethingChanged = false;
+  
+      elements.forEach(stroke => {
+          let currentSegment: { x: number; y: number }[] = [];
+          let pointsErasedInStroke = 0;
+          const segments: { x: number; y: number }[][] = [];
+  
+          for (const point of stroke.points) {
+              const distance = Math.hypot(point.x - worldX, point.y - worldY);
+              if (distance < eraserRadius) {
+                  pointsErasedInStroke++;
+                  if (currentSegment.length > 1) {
+                      segments.push(currentSegment);
+                  }
+                  currentSegment = [];
+              } else {
+                  currentSegment.push(point);
+              }
+          }
+  
+          if (currentSegment.length > 1) {
+              segments.push(currentSegment);
+          }
+  
+          if (pointsErasedInStroke === 0) {
+              newElements.push(stroke);
+          } else {
+              somethingChanged = true;
+              segments.forEach((segment, index) => {
+                  newElements.push({
+                      ...stroke,
+                      id: `${stroke.id}_split_${Date.now()}_${index}`,
+                      points: segment,
+                  });
+              });
+          }
+      });
+  
+      if (somethingChanged) {
+          setElements(newElements);
+      }
+    } else if (tool === 'selection' && selection && !isPanningSelection) {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      
-      continueDrawing(x, y);
+      const worldX = (x - viewport.x) / viewport.zoom;
+      const worldY = (y - viewport.y) / viewport.zoom;
+      setSelection({
+        ...selection,
+        width: worldX - selection.x,
+        height: worldY - selection.y,
+      });
     }
   };
 
@@ -660,9 +738,52 @@ export const useDashboard = (): UseDashboardReturn => {
       setLastPanPoint(null);
     }
 
-    if (isDrawing) {
-      console.log('STOPPING DRAWING');
+    if (drawingState === 'drawing') {
       finishDrawing();
+    }
+
+    if (drawingState === 'erasing') {
+      setDrawingState('idle');
+      saveCanvasState();
+    }
+    
+    if (drawingState === 'resizing') {
+      setDrawingState('idle');
+      setResizeStart(null);
+      saveCanvasState();
+    }
+    
+    if (tool === 'selection' && selection) {
+      // Normalize the rectangle.
+      const newSelection = { ...selection };
+      if (newSelection.width < 0) {
+        newSelection.x = newSelection.x + newSelection.width;
+        newSelection.width = -newSelection.width;
+      }
+      if (newSelection.height < 0) {
+        newSelection.y = newSelection.y + newSelection.height;
+        newSelection.height = -newSelection.height;
+      }
+
+      if (newSelection.width < 5 && newSelection.height < 5) {
+        setSelection(null);
+      } else {
+        setSelection(newSelection);
+        const selectedIds = elements.filter(el => {
+          const elBbox = getStrokesBoundingBox([el]);
+          if (!elBbox) return false;
+          // Simple intersection check
+          return (
+            newSelection.x < elBbox.x + elBbox.width &&
+            newSelection.x + newSelection.width > elBbox.x &&
+            newSelection.y < elBbox.y + elBbox.height &&
+            newSelection.y + newSelection.height > elBbox.y
+          );
+        }).map(el => el.id);
+        setSelectedElementIds(selectedIds);
+        setSelection(null); // Clear the drawing rectangle
+        setTool('hand'); // Switch to hand tool after selection
+      }
     }
   };
 
@@ -717,7 +838,7 @@ export const useDashboard = (): UseDashboardReturn => {
       setViewport(newViewport);
       setLastPanPoint({ x: touch.clientX, y: touch.clientY });
       
-    } else if (isDrawing && lastPoint) {
+    } else if (drawingState === 'drawing') {
       const canvas = canvasRef.current;
       if (!canvas) return;
       
@@ -739,8 +860,7 @@ export const useDashboard = (): UseDashboardReturn => {
       setLastPanPoint(null);
     }
 
-    if (isDrawing) {
-      console.log('STOPPING TOUCH DRAWING');
+    if (drawingState === 'drawing') {
       finishDrawing();
     }
   };
@@ -910,6 +1030,10 @@ export const useDashboard = (): UseDashboardReturn => {
           e.preventDefault();
           toggleHandTool();
           break;
+        case 'Escape':
+          e.preventDefault();
+          setSelectedElementIds([]);
+          break;
         case 'Digit1':
           e.preventDefault();
           setBrushType('pencil');
@@ -996,6 +1120,7 @@ export const useDashboard = (): UseDashboardReturn => {
     setBrushSize(5);
     setBrushOpacity(1);
     setEraserSize(20);
+    setElements([]); // Clear elements
     
     // Clear canvas immediately
     const canvas = canvasRef.current;
@@ -1038,8 +1163,8 @@ export const useDashboard = (): UseDashboardReturn => {
     }
     
     // Reset history AFTER clearing canvas - start fresh with single empty state
-    setCanvasHistory([]);
-    setHistoryIndex(-1);
+    setHistory([[]]);
+    setHistoryIndex(0);
     
     // Save the clean empty state as the first history entry
     setTimeout(() => {
@@ -1050,55 +1175,56 @@ export const useDashboard = (): UseDashboardReturn => {
     }, 10);
   };
 
-  const sendData = async (texts?: Array<{id: string, text: string, x: number, y: number, rotation: number}>, textStyle?: {fontFamily: string, fontSize: number, color: string, opacity: number, fontWeight: string, fontStyle: string}) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const sendData = async () => {
+    const strokesToAnalyze = selectedElementIds.length > 0
+      ? elements.filter(el => selectedElementIds.includes(el.id))
+      : elements;
+
+    if (strokesToAnalyze.length === 0) {
+      setError("Nothing to analyze. Please draw something first.");
+      return;
+    }
+    
+    const boundingBox = getStrokesBoundingBox(strokesToAnalyze);
+    if (!boundingBox) {
+      setError("Could not determine the area to analyze.");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    const PADDING = 20;
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = boundingBox.width + PADDING * 2;
+    tempCanvas.height = boundingBox.height + PADDING * 2;
+    const tempCtx = tempCanvas.getContext('2d');
+
+    if (!tempCtx) {
+      setError("Could not create a temporary canvas for analysis.");
+      setIsLoading(false);
+      return;
+    }
+
+    // White background for better recognition
+    tempCtx.fillStyle = 'white';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    
+    tempCtx.translate(-boundingBox.x + PADDING, -boundingBox.y + PADDING);
+
+    strokesToAnalyze.forEach(stroke => {
+      tempCtx.beginPath();
+      tempCtx.strokeStyle = stroke.color === 'white' ? 'black' : stroke.color; // Ensure visibility on white bg
+      tempCtx.lineWidth = stroke.brushSize;
+      tempCtx.globalAlpha = stroke.opacity;
+      
+      const path = getStrokeAsPath(stroke);
+      tempCtx.stroke(new Path2D(path));
+    });
 
     try {
-      setIsLoading(true);
-      setError(null);
-
-      // Create a temporary canvas to combine drawn content and text
-      const tempCanvas = document.createElement('canvas');
-      const tempCtx = tempCanvas.getContext('2d');
-      if (!tempCtx) return;
-
-      // Set same dimensions as main canvas
-      tempCanvas.width = canvas.width;
-      tempCanvas.height = canvas.height;
-
-      // Copy the main canvas content
-      tempCtx.drawImage(canvas, 0, 0);
-
-      // Render text elements onto the temporary canvas if provided
-      if (texts && textStyle) {
-        texts.forEach(textElement => {
-          if (textElement.text.trim()) {
-            tempCtx.save();
-            
-            // Move to text position and apply rotation
-            tempCtx.translate(textElement.x, textElement.y);
-            tempCtx.rotate((textElement.rotation * Math.PI) / 180);
-            
-            // Set text styling
-            tempCtx.font = `${textStyle.fontStyle} ${textStyle.fontWeight} ${textStyle.fontSize}px ${textStyle.fontFamily}`;
-            tempCtx.fillStyle = textStyle.color;
-            tempCtx.globalAlpha = textStyle.opacity;
-            tempCtx.textAlign = 'left';
-            tempCtx.textBaseline = 'top';
-            
-            // Handle multi-line text
-            const lines = textElement.text.split('\n');
-            lines.forEach((line, index) => {
-              tempCtx.fillText(line, 0, index * textStyle.fontSize * 1.2);
-            });
-            
-            tempCtx.restore();
-          }
-        });
-      }
-
       const imageData = tempCanvas.toDataURL("image/png");
+      
       const response = await axios({
         method: "POST",
         url: "/api/calculate",
@@ -1122,19 +1248,72 @@ export const useDashboard = (): UseDashboardReturn => {
   };
 
   const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    console.log('=== DOUBLE CLICK ===');
+    e.preventDefault();
+    setSelectedElementIds([]);
     
-    const canvas = canvasRef.current;
-    if (!canvas || typeof window === "undefined") return;
-
     // Only switch to hand tool for immediate panning, don't auto-center
     if (tool !== 'hand') {
       previousToolRef.current = tool;
       setTool('hand');
     }
+  };
+
+  const zoomToSelection = () => {
+    if (!selection) return;
+
+    const selectedStrokes = elements.filter(el => selectedElementIds.includes(el.id));
+    if (selectedStrokes.length === 0) return;
+
+    const boundingBox = getStrokesBoundingBox(selectedStrokes);
+    if (!boundingBox) return;
+
+    const padding = 50; // Add some padding
+    const newWidth = boundingBox.width + padding * 2;
+    const newHeight = boundingBox.height + padding * 2;
+
+    const currentCenterX = window.innerWidth / 2;
+    const currentCenterY = window.innerHeight / 2;
+
+    const newX = currentCenterX - newWidth / 2;
+    const newY = currentCenterY - newHeight / 2;
+
+    const newZoom = Math.min(
+      MAX_ZOOM,
+      Math.max(MIN_ZOOM, Math.min(window.innerWidth / newWidth, window.innerHeight / newHeight))
+    );
+
+    setViewport({ x: newX, y: newY, zoom: newZoom });
+  };
+
+  const scaleSelection = (scaleFactor: number) => {
+    const selectedStrokes = elements.filter(el => selectedElementIds.includes(el.id));
+    if (selectedStrokes.length === 0) return;
+
+    const boundingBox = getStrokesBoundingBox(selectedStrokes);
+    if (!boundingBox) return;
+
+    const centerX = boundingBox.x + boundingBox.width / 2;
+    const centerY = boundingBox.y + boundingBox.height / 2;
+
+    const updatedElements = elements.map(el => {
+      if (!selectedElementIds.includes(el.id)) return el;
+
+      return {
+        ...el,
+        points: el.points.map(p => ({
+          x: (p.x - centerX) * scaleFactor + centerX,
+          y: (p.y - centerY) * scaleFactor + centerY,
+        })),
+      };
+    });
     
-    // Prevent any default double-click behavior
-    e.preventDefault();
+    setElements(updatedElements);
+
+    // Save state
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(updatedElements);
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
   };
 
   return {
@@ -1154,13 +1333,13 @@ export const useDashboard = (): UseDashboardReturn => {
     isErasing: isEraserEnabled,
     draggingLatex: null,
     isEraserEnabled,
-    canvasHistory,
     historyIndex,
     canUndo,
     canRedo,
     viewport,
     lastPanPoint,
     isPanning,
+    isPanningSelection,
     isHandTool,
     isSpacePressed,
     tool,
@@ -1173,11 +1352,17 @@ export const useDashboard = (): UseDashboardReturn => {
     showMinimap,
     canvasBackgroundColor,
     lastPoint,
+    selection,
+    selectionViewport,
+    elements,
+    selectedElementIds,
+    drawingState,
     setSelectedColor,
     setIsEraserEnabled,
     setViewport,
     setLastPanPoint,
     setIsPanning,
+    setIsPanningSelection,
     setTool,
     setShowMinimap,
     setBrushType,
@@ -1185,6 +1370,8 @@ export const useDashboard = (): UseDashboardReturn => {
     setBrushOpacity,
     setEraserSize,
     setCanvasBackgroundColor,
+    setSelection,
+    setSelectionViewport,
     handleKeyDown,
     handleKeyUp,
     handleResize,
@@ -1193,7 +1380,7 @@ export const useDashboard = (): UseDashboardReturn => {
     saveCanvasState,
     undo,
     redo,
-    restoreCanvasFromImage,
+    restoreElements,
     resetCanvas,
     sendData,
     handleMouseDown,
@@ -1213,6 +1400,10 @@ export const useDashboard = (): UseDashboardReturn => {
     centerCanvas,
     toggleHandTool,
     toggleEraser,
-    getCursor
+    getCursor,
+    setElements,
+    setSelectedElementIds,
+    zoomToSelection,
+    scaleSelection,
   };
 };

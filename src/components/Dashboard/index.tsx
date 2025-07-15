@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 "use client";
-import React, { useEffect, useState} from "react";
+import React, { useEffect, useState } from "react";
 import Canvas from "../canvas/Canvas";
 import Toolbar from "../ToolBar";
 import Minimap from "../Minimap";
@@ -10,9 +10,12 @@ import KeyboardShortcuts from "../KeyboardShortcuts";
 import ColorPicker from "../ColorPicker";
 import CanvasSettings from "../CanvasSettings";
 import { useDashboard } from "./useDashboard";
-import { BrushType, TextElement, TextStyle } from "../../lib/types";
-import { TextEditor } from '../Text/TextEditor';
-import { TextPanel } from '../Text/TextPanel';
+import SelectionToolbar from '../SelectionToolbar';
+import { getStrokesBoundingBox } from "@/lib/canvas-utils";
+import { Stroke } from "@/lib/types";
+import { useText } from "@/hooks/useText";
+import { TextEditor } from "../Text/TextEditor";
+import { TextPanel } from "../Text/TextPanel";
 
 declare global {
   interface Window {
@@ -22,30 +25,16 @@ declare global {
 
 export default function DashboardComponent() {
   const [showColorPicker, setShowColorPicker] = useState(false);
-  const [canvasKey, setCanvasKey] = useState(0);
   const [showCanvasSettings, setShowCanvasSettings] = useState(false);
-  const [texts, setTexts] = useState<TextElement[]>([]);
-  const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
-  const [textStyle, setTextStyle] = useState<TextStyle>({
-    fontFamily: 'Inter, sans-serif',
-    fontSize: 16,
-    color: '#000000',
-    opacity: 1,
-    fontWeight: 'normal',
-    fontStyle: 'normal',
-    textAlign: 'left',
-  });
-  
+  const dashboard = useDashboard();
   const {
     canvasRef,
     selectedColor,
     result,
     isLoading,
-    latexExpression,
     isEraserEnabled,
     canUndo,
     canRedo,
-    viewport,
     tool,
     brushType,
     brushSize,
@@ -54,7 +43,6 @@ export default function DashboardComponent() {
     showMinimap,
     canvasBackgroundColor,
     setSelectedColor,
-    setViewport,
     setTool,
     setShowMinimap,
     setBrushType,
@@ -81,8 +69,22 @@ export default function DashboardComponent() {
     toggleHandTool,
     toggleEraser,
     getCursor,
-    worldCanvasRef
-  } = useDashboard();
+    worldCanvasRef,
+  } = dashboard;
+  const {
+    texts,
+    selectedTextId,
+    textStyle,
+    createText,
+    updateText,
+    deleteText,
+    updateTextPosition,
+    updateTextRotation,
+    finishEditing,
+    setSelectedTextId,
+    setTextStyle,
+  } = useText();
+  const [canvasKey, setCanvasKey] = useState(0);
 
   useEffect(() => {
     // Load MathJax
@@ -105,21 +107,41 @@ export default function DashboardComponent() {
   }, []);
 
   useEffect(() => {
-    if (latexExpression.length > 0) {
+    if (dashboard.latexExpression.length > 0) {
       window.MathJax?.typesetPromise?.();
     }
-  }, [latexExpression]);
-
-  const handleSetBrushType = (newBrushType: BrushType) => {
-    setBrushType(newBrushType);
-    setTool('draw'); // Automatically switch to draw tool when selecting a brush
-  };
+  }, [dashboard.latexExpression]);
 
   const handleReset = () => {
     resetCanvas();
-    setTexts([]);
-    setSelectedTextId(null);
+    // Also reset text state if needed
+    // setTexts([]);
     setCanvasKey((k) => k + 1);
+  };
+
+  const isCanvasEmpty = dashboard.elements.length === 0 && texts.length === 0;
+
+  const handleStyleChange = (style: Partial<typeof textStyle>) => {
+    setTextStyle(prev => ({ ...prev, ...style }));
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent) => {
+    if (tool === 'text') {
+      const target = e.target as HTMLElement;
+      if (target.closest('.text-editor-container') || target.closest('.text-panel')) {
+        return;
+      }
+
+      if (selectedTextId) {
+        finishEditing(selectedTextId);
+        return;
+      }
+      
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const x = (e.clientX - rect.left - dashboard.viewport.x) / dashboard.viewport.zoom;
+      const y = (e.clientY - rect.top - dashboard.viewport.y) / dashboard.viewport.zoom;
+      createText(x, y);
+    }
   };
 
   const toolbarProps = {
@@ -128,7 +150,8 @@ export default function DashboardComponent() {
     canUndo,
     canRedo,
     tool,
-    onCalculate: () => sendData(texts, textStyle),
+    onCalculate: sendData,
+    isCanvasEmpty,
     onReset: handleReset,
     onUndo: undo,
     onRedo: redo,
@@ -139,7 +162,10 @@ export default function DashboardComponent() {
     onCenterCanvas: centerCanvas,
     onToggleMinimap: () => setShowMinimap(!showMinimap),
     toggleHandTool: toggleHandTool,
-    onSetBrushType: handleSetBrushType,
+    onSetBrushType: (newBrushType: any) => {
+      setBrushType(newBrushType);
+      setTool('draw');
+    },
     currentBrushType: brushType,
     showColorPicker,
     onToggleColorPicker: () => setShowColorPicker(!showColorPicker),
@@ -167,78 +193,8 @@ export default function DashboardComponent() {
     handleContextMenu,
     handleDoubleClick,
     getCursor,
-    viewport,
-  };
-
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    if (tool !== 'text') return;
-
-    // Prevent creating text when clicking on existing text elements or UI
-    const target = e.target as HTMLElement;
-    if (target.closest('.text-element') || 
-        target.closest('.text-panel') || 
-        target.tagName === 'TEXTAREA' ||
-        target.tagName === 'BUTTON') {
-      return;
-    }
-
-    // If there's already a selected text that's being edited, don't create new one
-    if (selectedTextId && texts.find(t => t.id === selectedTextId && !t.text.trim())) {
-      return;
-    }
-
-    // Deselect current text if clicking empty space
-    if (selectedTextId) {
-      setSelectedTextId(null);
-      return;
-    }
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const newText: TextElement = {
-      id: Date.now().toString(),
-      text: '',
-      x,
-      y,
-      rotation: 0,
-    };
-
-    setTexts([...texts, newText]);
-    setSelectedTextId(newText.id);
-  };
-
-  const handleTextChange = (id: string, newText: string) => {
-    setTexts(texts.map(text => 
-      text.id === id ? { ...text, text: newText } : text
-    ));
-  };
-
-  const handleTextFinish = (id: string) => {
-    setTexts(texts.filter(text => text.id !== id || text.text.trim() !== ''));
-    setSelectedTextId(null);
-  };
-
-  const handleTextPosition = (id: string, x: number, y: number) => {
-    setTexts(texts.map(text =>
-      text.id === id ? { ...text, x, y } : text
-    ));
-  };
-
-  const handleTextRotation = (id: string, rotation: number) => {
-    setTexts(texts.map(text =>
-      text.id === id ? { ...text, rotation } : text
-    ));
-  };
-
-  const handleTextDelete = (id: string) => {
-    setTexts(texts.filter(text => text.id !== id));
-    setSelectedTextId(null);
-  };
-
-  const handleStyleChange = (style: Partial<TextStyle>) => {
-    setTextStyle(prev => ({ ...prev, ...style }));
+    viewport: dashboard.viewport,
+    selection: dashboard.selection,
   };
 
   return (
@@ -266,20 +222,19 @@ export default function DashboardComponent() {
           onClick={handleCanvasClick}
         >
           <Canvas key={canvasKey} {...canvasProps} />
-          
+          <SelectionManager dashboard={dashboard} />
           {/* Text Elements */}
           {texts.map(text => (
             <TextEditor
               key={text.id}
               textElement={text}
               textStyle={textStyle}
-              onTextChange={handleTextChange}
-              onFinishEditing={handleTextFinish}
-              onPositionChange={handleTextPosition}
-              onRotationChange={handleTextRotation}
-              onDelete={handleTextDelete}
+              onTextChange={updateText}
+              onFinishEditing={finishEditing}
+              onPositionChange={updateTextPosition}
+              onRotationChange={updateTextRotation}
+              onDelete={deleteText}
               isSelected={selectedTextId === text.id}
-              viewportZoom={viewport.zoom}
               onSelect={() => setSelectedTextId(text.id)}
             />
           ))}
@@ -290,8 +245,8 @@ export default function DashboardComponent() {
       {showMinimap && (
         <Minimap
           mainCanvasRef={worldCanvasRef}
-          viewport={viewport}
-          onViewportChange={setViewport}
+          viewport={dashboard.viewport}
+          onViewportChange={dashboard.setViewport}
           isVisible={showMinimap}
           onToggleVisibility={() => setShowMinimap(!showMinimap)}
           canvasDimensions={{ width: 5000, height: 5000 }}
@@ -334,7 +289,8 @@ export default function DashboardComponent() {
       )}
 
    
-      <TextPanel
+      {/* TextPanel - This component is no longer used as text editing is handled by TextEditor */}
+      {/* <TextPanel
         textStyle={textStyle}
         onStyleChange={handleStyleChange}
         isVisible={tool === 'text'}
@@ -358,7 +314,15 @@ export default function DashboardComponent() {
           setTexts([]);
           setSelectedTextId(null);
         }}
-      />
+      /> */}
+
+      {selectedTextId && (
+        <TextPanel 
+          textStyle={textStyle}
+          onStyleChange={handleStyleChange}
+          isVisible={!!selectedTextId}
+        />
+      )}
 
       <style jsx>{`
         @keyframes drift {
@@ -369,3 +333,53 @@ export default function DashboardComponent() {
     </div>
   );
 }
+
+const SelectionManager = ({ dashboard }: { dashboard: any }) => {
+  const { 
+    elements, 
+    selectedElementIds, 
+    viewport, 
+    sendData, 
+    setSelectedElementIds,
+    scaleSelection,
+  } = dashboard;
+
+  if (selectedElementIds.length === 0) {
+    return null;
+  }
+
+  const selectedStrokes = elements.filter((el: Stroke) => selectedElementIds.includes(el.id));
+  const boundingBox = getStrokesBoundingBox(selectedStrokes);
+
+  if (!boundingBox) {
+    return null;
+  }
+
+  const { x, y, width, height } = boundingBox;
+
+  return (
+    <div
+      className="absolute pointer-events-none border border-blue-500 border-dashed"
+      style={{
+        left: `${viewport.x + x * viewport.zoom}px`,
+        top: `${viewport.y + y * viewport.zoom}px`,
+        width: `${width * viewport.zoom}px`,
+        height: `${height * viewport.zoom}px`,
+      }}
+    >
+      <div className="absolute -top-10 right-0 pointer-events-auto">
+        <SelectionToolbar
+          onSolve={sendData}
+          onZoomIn={() => scaleSelection(1.1)}
+          onZoomOut={() => scaleSelection(0.9)}
+          onClearSelection={() => setSelectedElementIds([])}
+        />
+      </div>
+      {/* Resize Handles */}
+      <div onMouseDown={(e) => { e.stopPropagation(); dashboard.handleMouseDown(e, 'top-left'); }} className="absolute -left-1 -top-1 w-3 h-3 bg-blue-500 cursor-nwse-resize pointer-events-auto" />
+      <div onMouseDown={(e) => { e.stopPropagation(); dashboard.handleMouseDown(e, 'top-right'); }} className="absolute -right-1 -top-1 w-3 h-3 bg-blue-500 cursor-nesw-resize pointer-events-auto" />
+      <div onMouseDown={(e) => { e.stopPropagation(); dashboard.handleMouseDown(e, 'bottom-left'); }} className="absolute -left-1 -bottom-1 w-3 h-3 bg-blue-500 cursor-nesw-resize pointer-events-auto" />
+      <div onMouseDown={(e) => { e.stopPropagation(); dashboard.handleMouseDown(e, 'bottom-right'); }} className="absolute -right-1 -bottom-1 w-3 h-3 bg-blue-500 cursor-nwse-resize pointer-events-auto" />
+    </div>
+  );
+};

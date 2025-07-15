@@ -23,12 +23,14 @@ import {
   Settings,
   Activity,
   Check,
+  Move,
 } from "lucide-react";
 import { FaFont } from "react-icons/fa";
 
 interface ToolbarProps {
   isLoading: boolean;
   isEraserEnabled: boolean;
+  isCanvasEmpty: boolean;
   canUndo?: boolean;
   canRedo?: boolean;
   onCalculate: () => void;
@@ -57,6 +59,7 @@ interface ToolbarProps {
 const Toolbar: React.FC<ToolbarProps> = ({
   isLoading,
   isEraserEnabled,
+  isCanvasEmpty,
   canUndo = false,
   canRedo = false,
   tool,
@@ -133,7 +136,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
             ? 'bg-blue-500/20 text-blue-300' 
             : 'text-white/80 hover:bg-white/20'
         }`}
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation();
           onClick?.();
           if (children) {
             setActivePopover(activePopover === label ? null : label);
@@ -296,6 +300,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
             onClick={() => onSetTool('text')}
             isActive={tool === 'text'}
           />
+
+          <ToolButton
+            icon={Move}
+            label="Selection Tool (S)"
+            onClick={() => onSetTool('selection')}
+            isActive={tool === 'selection'}
+          />
           
           <div className="w-px h-6 bg-white/20 mx-2" />
           
@@ -321,7 +332,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
           
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button onClick={onCalculate} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 h-10 rounded-lg">
+              <Button onClick={onCalculate} disabled={isLoading || isCanvasEmpty} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 h-10 rounded-lg">
                 {isLoading ? <Activity className="w-5 h-5 animate-spin" /> : "Calculate"}
               </Button>
             </TooltipTrigger>

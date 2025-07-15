@@ -15,6 +15,11 @@ interface GeneratedResult {
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
 
+// Helper function to wait before retrying
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 // Helper function to extract JSON from markdown response
 function extractJsonFromMarkdown(markdown: string): string {
   const jsonMatch = markdown.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
@@ -92,7 +97,39 @@ ${variableStr}
       },
     };
 
-    const response = await model.generateContent([prompt, image]);
+    let response;
+    const maxRetries = 3;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        response = await model.generateContent([prompt, image]);
+        break; // Success, exit loop
+      } catch (error) {
+        // Check if it's a GoogleGenerativeAI error with a 503 status
+        if (
+          error &&
+          typeof error === "object" &&
+          "status" in error &&
+          (error as { status: unknown }).status === 503 &&
+          attempt < maxRetries - 1
+        ) {
+          const waitTime = Math.pow(2, attempt) * 1000;
+          console.log(
+            `Model overloaded. Retrying in ${
+              waitTime / 1000
+            }s... (Attempt ${attempt + 1}/${maxRetries})`
+          );
+          await delay(waitTime);
+        } else {
+          // For other errors or if retries are exhausted, re-throw
+          throw error;
+        }
+      }
+    }
+
+    if (!response) {
+      throw new Error("API call failed after all retries.");
+    }
+
     const result = await response.response;
     const textResponse = result.text();
 

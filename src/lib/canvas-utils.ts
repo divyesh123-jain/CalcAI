@@ -1,4 +1,4 @@
-import { Point, ViewPort } from './types';
+import { Point, ViewPort, Stroke, Rect } from './types';
 
 // Constants
 export const ZOOM_SENSITIVITY = 0.001;
@@ -45,3 +45,40 @@ export function drawGrid(
     }
   }
 }
+
+export const getStrokeAsPath = (stroke: Stroke) => {
+  if (!stroke.points || stroke.points.length === 0) return '';
+  
+  const path = stroke.points
+    .map((p, i) => {
+      if (i === 0) return `M ${p.x} ${p.y}`;
+      return `L ${p.x} ${p.y}`;
+    })
+    .join(' ');
+    
+  return path;
+};
+
+export const getStrokesBoundingBox = (strokes: Stroke[]): Rect | null => {
+  if (strokes.length === 0) return null;
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  strokes.forEach(stroke => {
+    stroke.points.forEach(point => {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    });
+  });
+
+  if (minX === Infinity) return null;
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+};

@@ -40,7 +40,7 @@ export interface Point {
   }
 
   export type BrushType = 'pencil' | 'marker' | 'highlighter';
-  export type Tool = 'draw' | 'hand' | 'eraser' | 'text';
+  export type Tool = 'draw' | 'hand' | 'eraser' | 'text' | 'selection';
 
   // New types for enhanced UI
   export interface UITheme {
@@ -89,4 +89,19 @@ export interface Point {
     name: string;
     family: string;
     category: 'sans-serif' | 'serif' | 'monospace' | 'handwriting' | 'display';
+  }
+
+  export interface Rect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }
+
+  export interface Stroke {
+    id: string;
+    points: { x: number; y: number; pressure?: number }[];
+    color: string;
+    brushSize: number;
+    opacity: number;
   }
