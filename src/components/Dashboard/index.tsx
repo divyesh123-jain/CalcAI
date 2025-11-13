@@ -4,7 +4,6 @@
 import React, { useEffect, useState } from "react";
 import Canvas from "../canvas/Canvas";
 import Toolbar from "../ToolBar";
-// import Minimap from "../Minimap";
 import ResultsDisplay from "../ResultDisplay";
 import KeyboardShortcuts from "../KeyboardShortcuts";
 import ColorPicker from "../ColorPicker";
